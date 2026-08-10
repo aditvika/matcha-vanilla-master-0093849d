@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RequireAuth } from "@/components/require-auth";
 import { QuotaPanel } from "@/components/quota-panel";
 
@@ -107,7 +107,12 @@ const notifications: Notification[] = [
   },
 ];
 
-import { getInitials, type LeaderTab } from "@/lib/leaderboard-data";
+import {
+  fetchLeaderboardData,
+  getInitials,
+  type LeaderTab,
+  type LeaderEntry,
+} from "@/lib/leaderboard-data";
 
 const rankMeta = [
   { Icon: Crown, cls: "lb-rank-gold" },
@@ -124,6 +129,26 @@ function HomePage() {
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [leaderTab, setLeaderTab] = useState<LeaderTab>("Bulanan");
+  const [leaderboardFull, setLeaderboardFull] = useState<Record<LeaderTab, LeaderEntry[]>>({
+    Bulanan: [],
+    Tahunan: [],
+    Mix: [],
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      const res = await fetchLeaderboardData();
+      if (mounted) setLeaderboardFull(res);
+    };
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener("mv:mvp-updated", onUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener("mv:mvp-updated", onUpdate);
+    };
+  }, []);
   const { isPremium } = usePremiumStatus();
   const { t } = useI18n();
   const { setMedia } = useSelectedMedia();
@@ -272,26 +297,32 @@ function HomePage() {
             ))}
           </div>
 
-          <ul className="lb-list">
-            {leaderboardFull[leaderTab].slice(0, 5).map((entry, i) => {
-              const { Icon, cls } = rankMeta[i];
-              const initials = getInitials(entry.name);
-              return (
-                <li key={entry.name} className="lb-row">
-                  <div className={`lb-rank ${cls}`}>
-                    <Icon size={18} />
-                    <span className="lb-rank-num">{i + 1}</span>
-                  </div>
-                  <div className="lb-avatar" aria-hidden>{initials}</div>
-                  <div className="lb-user">
-                    <p className="lb-name">{entry.name}</p>
-                    <span className="lb-tier">{entry.tier}</span>
-                  </div>
-                  <span className="lb-score">{entry.mvp} MVP</span>
-                </li>
-              );
-            })}
-          </ul>
+          {leaderboardFull[leaderTab].length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-6">
+              Belum ada pengguna di kategori ini.
+            </p>
+          ) : (
+            <ul className="lb-list">
+              {leaderboardFull[leaderTab].slice(0, 5).map((entry, i) => {
+                const { Icon, cls } = rankMeta[i];
+                const initials = getInitials(entry.name);
+                return (
+                  <li key={`${entry.name}-${i}`} className="lb-row">
+                    <div className={`lb-rank ${cls}`}>
+                      <Icon size={18} />
+                      <span className="lb-rank-num">{i + 1}</span>
+                    </div>
+                    <div className="lb-avatar" aria-hidden>{initials}</div>
+                    <div className="lb-user">
+                      <p className="lb-name">{entry.name}</p>
+                      <span className="lb-tier">{entry.tier}</span>
+                    </div>
+                    <span className="lb-score">{entry.mvp} MVP</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       </div>
 

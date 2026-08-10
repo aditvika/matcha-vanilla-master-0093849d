@@ -155,6 +155,14 @@ export type Database = {
         }[]
       }
       get_credit_status: { Args: never; Returns: Json }
+      get_leaderboard: {
+        Args: never
+        Returns: {
+          display_name: string
+          mvp_points: number
+          package_type: string
+        }[]
+      }
       get_quota_status: { Args: never; Returns: Json }
       get_server_date: { Args: never; Returns: string }
       quota_limit: {

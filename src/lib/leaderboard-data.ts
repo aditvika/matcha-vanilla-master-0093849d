@@ -25,56 +25,48 @@ export function getInitials(name: string) {
     .toUpperCase();
 }
 
+type LeaderboardRow = {
+  display_name: string | null;
+  package_type: string | null;
+  mvp_points: number | null;
+};
+
+const EMPTY: Record<LeaderTab, LeaderEntry[]> = { Bulanan: [], Tahunan: [], Mix: [] };
+
 export async function fetchLeaderboardData(): Promise<Record<LeaderTab, LeaderEntry[]>> {
   try {
-    const { data, error } = await (supabase
-      .from("profiles") as any)
-      .select("email, full_name, plan_type, mvp_points")
-      .gt("mvp_points", 0)
-      .order("mvp_points", { ascending: false });
+    const { data, error } = await (supabase.rpc as any)("get_leaderboard");
 
-    if (error || !data) {
-      return { Bulanan: [], Tahunan: [], Mix: [] };
-    }
+    if (error || !data) return { ...EMPTY };
 
-    const bulananList: LeaderEntry[] = [];
-    const tahunanList: LeaderEntry[] = [];
-    const mixList: LeaderEntry[] = [];
+    const bulanan: LeaderEntry[] = [];
+    const tahunan: LeaderEntry[] = [];
+    const mix: LeaderEntry[] = [];
 
-    (data as any[]).forEach((row) => {
-      const name = getDisplayNameFromEmail(row.email || row.full_name);
-      const points = row.mvp_points || 0;
-      const pkg = row.plan_type || "monthly";
+    (data as LeaderboardRow[]).forEach((row) => {
+      const name = getDisplayNameFromEmail(row.display_name);
+      const mvp = row.mvp_points ?? 0;
+      const pkg = row.package_type ?? "monthly";
 
-      let displayTier: "Bulanan" | "Tahunan" | "VIP+" = "Bulanan";
-      if (pkg === "yearly_vip" || pkg === "sultan") {
-        displayTier = "VIP+";
-      } else if (pkg === "yearly") {
-        displayTier = "Tahunan";
-      }
+      const tier: LeaderEntry["tier"] =
+        pkg === "yearly_vip" ? "VIP+" : pkg === "yearly" ? "Tahunan" : "Bulanan";
 
-      const entry: LeaderEntry = {
-        name,
-        tier: displayTier,
-        mvp: points,
-      };
+      const entry: LeaderEntry = { name, tier, mvp };
 
-      if (displayTier === "Bulanan") {
-        bulananList.push(entry);
-      } else if (displayTier === "Tahunan" || displayTier === "VIP+") {
-        tahunanList.push(entry);
-      }
-
-      mixList.push(entry);
+      if (tier === "Bulanan") bulanan.push(entry);
+      else tahunan.push(entry);
+      mix.push(entry);
     });
 
+    const desc = (a: LeaderEntry, b: LeaderEntry) => b.mvp - a.mvp;
+
     return {
-      Bulanan: bulananList.sort((a, b) => b.mvp - a.mvp),
-      Tahunan: tahunanList.sort((a, b) => b.mvp - a.mvp),
-      Mix: mixList.sort((a, b) => b.mvp - a.mvp),
+      Bulanan: bulanan.sort(desc),
+      Tahunan: tahunan.sort(desc),
+      Mix: mix.sort(desc),
     };
   } catch (err) {
     console.error("Error fetching leaderboard:", err);
-    return { Bulanan: [], Tahunan: [], Mix: [] };
+    return { ...EMPTY };
   }
 }
