@@ -107,7 +107,12 @@ const notifications: Notification[] = [
   },
 ];
 
-import { getInitials, type LeaderTab } from "@/lib/leaderboard-data";
+import {
+  fetchLeaderboardData,
+  getInitials,
+  type LeaderTab,
+  type LeaderEntry,
+} from "@/lib/leaderboard-data";
 
 const rankMeta = [
   { Icon: Crown, cls: "lb-rank-gold" },
