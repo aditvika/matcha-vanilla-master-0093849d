@@ -129,6 +129,26 @@ function HomePage() {
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [leaderTab, setLeaderTab] = useState<LeaderTab>("Bulanan");
+  const [leaderboardFull, setLeaderboardFull] = useState<Record<LeaderTab, LeaderEntry[]>>({
+    Bulanan: [],
+    Tahunan: [],
+    Mix: [],
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      const res = await fetchLeaderboardData();
+      if (mounted) setLeaderboardFull(res);
+    };
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener("mv:mvp-updated", onUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener("mv:mvp-updated", onUpdate);
+    };
+  }, []);
   const { isPremium } = usePremiumStatus();
   const { t } = useI18n();
   const { setMedia } = useSelectedMedia();
