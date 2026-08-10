@@ -108,42 +108,27 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
         return;
       }
 
-      const payload = data as { package_type?: string } | null;
+      const payload = data as
+        | { package_type?: string; mvp_added?: number; total_mvp_points?: number }
+        | null;
       const pkgType = payload?.package_type || "monthly";
+      const mvpAdded = payload?.mvp_added ?? 0;
 
-      // 2. Hitung Poin MVP berdasarkan Paket
-      // Bulanan = +2, Tahunan Hemat = +3, VIP+ Sultan = +5
-      let mvpToAdd = 2;
-      let pkgName = "Bulanan";
+      const pkgName =
+        pkgType === "yearly_vip"
+          ? "Tahunan VIP+ Sultan"
+          : pkgType === "yearly"
+            ? "Tahunan Hemat"
+            : "Bulanan";
 
-      if (pkgType === "yearly_vip" || pkgType === "sultan") {
-        mvpToAdd = 5;
-        pkgName = "Tahunan VIP+ Sultan";
-      } else if (pkgType === "yearly") {
-        mvpToAdd = 3;
-        pkgName = "Tahunan Hemat";
+      // MVP points are awarded server-side by claim_voucher; just refresh the UI.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("mv:mvp-updated"));
       }
 
-      // 3. Ambil nilai MVP saat ini dari profil menggunakan cast 'as any' agar aman dari strict TS
-      const { data: profile } = await (supabase
-        .from("profiles") as any)
-        .select("mvp_points")
-        .eq("id", user.id)
-        .single();
-
-      const currentMvp = profile?.mvp_points || 0;
-      const newMvp = currentMvp + mvpToAdd;
-
-      // 4. Update profil pengguna di database Supabase
-      await (supabase.from("profiles") as any)
-        .update({
-          plan_type: pkgType,
-          mvp_points: newMvp,
-          email: user.email,
-        })
-        .eq("id", user.id);
-
-      toast.success(`Selamat! Premium ${pkgName} aktif & +${mvpToAdd} Poin MVP berhasil ditambahkan! 🎉`);
+      toast.success(
+        `Selamat! Premium ${pkgName} aktif & +${mvpAdded} Poin MVP berhasil ditambahkan! 🎉`,
+      );
       setVoucherCode("");
       onOpenChange(false);
     } catch (err: any) {
