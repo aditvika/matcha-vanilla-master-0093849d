@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap, Shield, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseSession } from "@/hooks/use-supabase-session";
 
 interface SubscriptionModalProps {
   open: boolean;
