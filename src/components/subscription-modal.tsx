@@ -240,4 +240,3 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
     </Dialog>
   );
 }
-a
