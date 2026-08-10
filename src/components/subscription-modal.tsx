@@ -20,10 +20,23 @@ interface SubscriptionModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const PLANS = [
+type Plan = {
+  id: string;
+  name: string;
+  tab: string;
+  price: string;
+  period: string;
+  description: string;
+  badge: string | null;
+  popular?: boolean;
+  features: string[];
+};
+
+const PLANS: Plan[] = [
   {
     id: "monthly",
     name: "VIP Bulanan",
+    tab: "Bulanan",
     price: "Rp 15.000",
     period: "/bulan",
     description: "Cocok untuk penggunaan rutin bulanan",
@@ -38,6 +51,7 @@ const PLANS = [
   {
     id: "yearly",
     name: "VIP Tahunan Hemat",
+    tab: "Tahunan",
     price: "Rp 120.000",
     period: "/tahun",
     description: "Hemat hingga 33% dibandingkan bulanan",
@@ -54,6 +68,7 @@ const PLANS = [
   {
     id: "yearly_vip",
     name: "VIP+ Sultan",
+    tab: "VIP+",
     price: "Rp 250.000",
     period: "/tahun",
     description: "Paket lengkap untuk creator profesional",
