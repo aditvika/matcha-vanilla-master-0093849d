@@ -69,7 +69,7 @@ const PLANS = [
 ];
 
 export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps) {
-  const { user } = useAuth();
+  const { user } = useSupabaseSession();
   const [voucherCode, setVoucherCode] = useState("");
   const [claiming, setClaiming] = useState(false);
 
