@@ -20,10 +20,23 @@ interface SubscriptionModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const PLANS = [
+type Plan = {
+  id: string;
+  name: string;
+  tab: string;
+  price: string;
+  period: string;
+  description: string;
+  badge: string | null;
+  popular?: boolean;
+  features: string[];
+};
+
+const PLANS: Plan[] = [
   {
     id: "monthly",
     name: "VIP Bulanan",
+    tab: "Bulanan",
     price: "Rp 15.000",
     period: "/bulan",
     description: "Cocok untuk penggunaan rutin bulanan",
@@ -38,6 +51,7 @@ const PLANS = [
   {
     id: "yearly",
     name: "VIP Tahunan Hemat",
+    tab: "Tahunan",
     price: "Rp 120.000",
     period: "/tahun",
     description: "Hemat hingga 33% dibandingkan bulanan",
@@ -54,6 +68,7 @@ const PLANS = [
   {
     id: "yearly_vip",
     name: "VIP+ Sultan",
+    tab: "VIP+",
     price: "Rp 250.000",
     period: "/tahun",
     description: "Paket lengkap untuk creator profesional",
@@ -72,6 +87,10 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
   const { user } = useSupabaseSession();
   const [voucherCode, setVoucherCode] = useState("");
   const [claiming, setClaiming] = useState(false);
+  const [showVoucher, setShowVoucher] = useState(false);
+  const [activePlan, setActivePlan] = useState("yearly");
+
+  const selected = PLANS.find((p) => p.id === activePlan) ?? PLANS[0];
 
   const handleClaimVoucher = async () => {
     if (!voucherCode.trim()) {
@@ -130,6 +149,7 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
         `Selamat! Premium ${pkgName} aktif & +${mvpAdded} Poin MVP berhasil ditambahkan! 🎉`,
       );
       setVoucherCode("");
+      setShowVoucher(false);
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat mengklaim voucher");
@@ -139,104 +159,137 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-primary" />
-            Sewa / Beli Akses Premium
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) setShowVoucher(false);
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="max-w-md max-h-[88vh] overflow-y-auto p-4 gap-3">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-base font-bold flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+            Pilih Paket Premium Kamu 🚀
           </DialogTitle>
-          <DialogDescription>
-            Pilih paket keanggotaan atau klaim kode voucher kamu untuk membuka semua fitur VIP.
+          <DialogDescription className="text-[11px] leading-snug">
+            Pilih paket keanggotaan yang paling cocok untuk kebutuhan kreatif kamu.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Form Klaim Voucher */}
-        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 my-2">
-          <div className="flex items-center gap-2 mb-2 font-semibold text-sm">
-            <Gift className="w-4 h-4 text-primary" />
-            Punya Kode Voucher / Akses VIP?
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Label htmlFor="voucher" className="sr-only">
-                Kode Voucher
-              </Label>
-              <Input
-                id="voucher"
-                placeholder="Masukkan kode voucher (contoh: VIP-SULTAN)..."
-                value={voucherCode}
-                onChange={(e) => setVoucherCode(e.target.value)}
-                disabled={claiming}
-                className="bg-background"
-              />
-            </div>
-            <Button onClick={handleClaimVoucher} disabled={claiming}>
-              {claiming ? "Mengklaim..." : "Aktifkan Voucher"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Pilihan Paket */}
-        <div className="grid md:grid-cols-3 gap-4 mt-4">
+        {/* Tab toggle paket */}
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1">
           {PLANS.map((plan) => (
-            <div
+            <button
               key={plan.id}
-              className={`border rounded-xl p-5 flex flex-col justify-between relative bg-card ${
-                plan.popular ? "border-primary shadow-md" : "border-border"
+              type="button"
+              onClick={() => setActivePlan(plan.id)}
+              className={`rounded-lg px-1 py-1.5 text-[11px] font-semibold transition-colors ${
+                activePlan === plan.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {plan.badge && (
-                <div className="absolute -top-3 right-4">
-                  <Badge variant={plan.popular ? "default" : "secondary"}>
-                    {plan.badge}
-                  </Badge>
-                </div>
-              )}
-
-              <div>
-                <h3 className="font-bold text-lg">{plan.name}</h3>
-                <p className="text-xs text-muted-foreground mt-1 mb-4">
-                  {plan.description}
-                </p>
-
-                <div className="mb-4">
-                  <span className="text-2xl font-extrabold">{plan.price}</span>
-                  <span className="text-xs text-muted-foreground">{plan.period}</span>
-                </div>
-
-                <ul className="space-y-2 text-xs mb-6">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-primary shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <Button
-                variant={plan.popular ? "default" : "outline"}
-                className="w-full"
-                onClick={() => {
-                  toast.info("Gunakan form Klaim Voucher di atas untuk mengaktifkan paket!");
-                }}
-              >
-                Pilih Paket
-              </Button>
-            </div>
+              {plan.tab}
+            </button>
           ))}
         </div>
 
-        <div className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center gap-4">
+        {/* Kartu paket aktif */}
+        <div
+          className={`relative rounded-xl border bg-card p-3.5 ${
+            selected.popular ? "border-primary shadow-sm" : "border-border"
+          }`}
+        >
+          {selected.badge && (
+            <div className="absolute -top-2.5 right-3">
+              <Badge variant={selected.popular ? "default" : "secondary"} className="text-[10px] px-2 py-0">
+                {selected.badge}
+              </Badge>
+            </div>
+          )}
+
+          <h3 className="font-bold text-sm">{selected.name}</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{selected.description}</p>
+
+          <div className="mt-2 mb-2.5">
+            <span className="text-xl font-extrabold">{selected.price}</span>
+            <span className="text-[11px] text-muted-foreground">{selected.period}</span>
+          </div>
+
+          <ul className="space-y-1 text-[11px] leading-snug mb-3">
+            {selected.features.map((feature, idx) => (
+              <li key={idx} className="flex items-start gap-1.5">
+                <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-[1px]" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+
+          <Button
+            size="sm"
+            className="w-full h-9 text-xs"
+            onClick={() => {
+              toast.info('Klik "Punya Kode Voucher?" untuk mengaktifkan paket dengan kode.');
+            }}
+          >
+            Pilih {selected.tab}
+          </Button>
+        </div>
+
+        {/* Voucher — hanya tampil bila diminta user */}
+        {!showVoucher ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-9 text-xs gap-1.5"
+            onClick={() => setShowVoucher(true)}
+          >
+            <Gift className="w-3.5 h-3.5 text-primary" />
+            Punya Kode Voucher?
+          </Button>
+        ) : (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2 font-semibold text-xs">
+              <Gift className="w-3.5 h-3.5 text-primary" />
+              Klaim Kode Voucher / Akses VIP
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1 min-w-0">
+                <Label htmlFor="voucher" className="sr-only">
+                  Kode Voucher
+                </Label>
+                <Input
+                  id="voucher"
+                  placeholder="Masukkan kode voucher..."
+                  value={voucherCode}
+                  onChange={(e) => setVoucherCode(e.target.value)}
+                  disabled={claiming}
+                  className="bg-background h-9 text-xs"
+                />
+              </div>
+              <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleClaimVoucher} disabled={claiming}>
+                {claiming ? "Mengklaim..." : "Aktifkan"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <p className="text-[10px] text-muted-foreground leading-snug text-center">
+          (NOTE) Nominal harga yang tertera sudah harga akhir, dan untuk kenyamanan bersama harga akan
+          terus di update lewat komunitas sesuai dengan pasar
+        </p>
+
+        <div className="text-center text-[10px] text-muted-foreground flex items-center justify-center gap-3">
           <span className="flex items-center gap-1">
-            <Shield className="w-3.5 h-3.5" /> Pembayaran Aman & Terverifikasi
+            <Shield className="w-3 h-3" /> Pembayaran Aman
           </span>
           <span className="flex items-center gap-1">
-            <Zap className="w-3.5 h-3.5" /> Aktivasi Otomatis Real-time
+            <Zap className="w-3 h-3" /> Aktivasi Real-time
           </span>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
