@@ -8,10 +8,11 @@ export type LeaderEntry = {
   mvp: number;
 };
 
-export function getDisplayNameFromEmail(email?: string | null): string {
-  if (!email) return "Pengguna";
-  const namePart = email.split("@")[0];
-  return namePart || "Pengguna";
+export const DEFAULT_DISPLAY_NAME = "Matcha User";
+
+export function getDisplayNameFromEmail(name?: string | null): string {
+  const trimmed = (name ?? "").trim();
+  return trimmed || DEFAULT_DISPLAY_NAME;
 }
 
 export function getInitials(name: string) {
