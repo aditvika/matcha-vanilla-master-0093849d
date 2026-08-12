@@ -113,6 +113,37 @@ function SettingsPage() {
     else localStorage.removeItem("mv:profile:avatar");
   }, [avatar]);
 
+  // Load the saved profile name from the account profile.
+  useEffect(() => {
+    if (!supaUser) return;
+    let active = true;
+    void supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", supaUser.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const saved = (data?.display_name ?? "").trim();
+        if (active && saved) setName(saved);
+      });
+    return () => {
+      active = false;
+    };
+  }, [supaUser]);
+
+  const handleSaveProfile = async () => {
+    const finalName = name.trim() || "Matcha User";
+    setName(finalName);
+    if (supaUser) {
+      await supabase
+        .from("profiles")
+        .upsert({ id: supaUser.id, email: supaUser.email ?? null, display_name: finalName });
+      window.dispatchEvent(new CustomEvent("mv:mvp-updated"));
+    }
+    setOpenSheet(null);
+  };
+
+
   const handleAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
