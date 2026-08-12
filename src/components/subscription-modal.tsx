@@ -131,10 +131,26 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
       }
 
       const payload = data as
-        | { package_type?: string; mvp_added?: number; total_mvp_points?: number }
+        | {
+            package_type?: string;
+            mvp_added?: number;
+            total_mvp_points?: number;
+            reviewer?: boolean;
+          }
         | null;
       const pkgType = payload?.package_type || "monthly";
       const mvpAdded = payload?.mvp_added ?? 0;
+
+      if (payload?.reviewer) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("mv:mvp-updated"));
+        }
+        toast.success("Welcome Fal.ai Audit Team! VIP Priority Access Activated.");
+        setVoucherCode("");
+        setShowVoucher(false);
+        onOpenChange(false);
+        return;
+      }
 
       const pkgName =
         pkgType === "yearly_vip"
