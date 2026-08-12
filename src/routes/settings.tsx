@@ -451,7 +451,7 @@ function SettingsPage() {
             <button
               type="button"
               className="settings-sheet-primary"
-              onClick={() => setOpenSheet(null)}
+              onClick={() => void handleSaveProfile()}
             >
               {t("common.save")}
             </button>
