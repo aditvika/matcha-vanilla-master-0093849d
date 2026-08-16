@@ -56,8 +56,8 @@ export function PremiumModal({ open, onOpenChange, onUnderstand }: { open: boole
                 <strong>Ketentuan Pemakaian Kredit Premium:</strong>
               </p>
               <ul className="premium-modal-list">
-                <li>Foto HD / 2K: 1 Kredit | Foto Ultra 4K: 2 Kredit</li>
-                <li>Video HD: 5 Kredit | Video Ultra 2K/4K: 10 Kredit</li>
+                <li>Foto HD / 2K : 1 Kredit | Foto Ultra 4K : 2 Kredit</li>
+                <li>Video HD / 1080p : 5 Kredit | Video Ultra 2K / 4K : 15 Kredit</li>
               </ul>
 
               <p className="premium-modal-line">
