@@ -41,7 +41,7 @@ function CreditList({ onUpgrade }: { onUpgrade: () => void }) {
         { label: "Photo (720p – 2K)", cost: "1 Credit" },
         { label: "Photo Ultra (4K)", cost: "2 Credits" },
         { label: "Video HD (720p – 1080p)", cost: "5 Credits" },
-        { label: "Video Ultra (2K – 4K)", cost: "10 Credits" },
+        { label: "Video Ultra (2K – 4K)", cost: "15 Credits" },
       ];
 
   return (

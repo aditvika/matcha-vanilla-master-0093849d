@@ -44,7 +44,8 @@ const PLANS: Plan[] = [
     features: [
       "Semua akses resolusi terbuka",
       "Bonus +2 MVP Point Leaderboard",
-      "Alokasi hingga 200 Kredit per bulan",
+      "Alokasi hingga 200 Kredit per bulan (Sisa kredit reset/hangus tiap akhir bulan)",
+      "Konsumsi: Foto (1-2 Kredit), Video (5-15 Kredit)",
       "Dukungan Komunitas VIP",
     ],
   },
@@ -60,7 +61,8 @@ const PLANS: Plan[] = [
     features: [
       "Semua akses resolusi terbuka",
       "Bonus +3 MVP Point Leaderboard",
-      "Alokasi hingga 250 Kredit per bulan",
+      "Alokasi hingga 250 Kredit per bulan (Reset tiap bulan, total 3.000 kredit/tahun)",
+      "Konsumsi: Foto (1-2 Kredit), Video (5-15 Kredit)",
       "Prioritas kompilasi server cepat",
       "Metode hemat untuk sehari-hari",
       "Dukungan komunitas VIP",
@@ -77,11 +79,11 @@ const PLANS: Plan[] = [
     features: [
       "Semua akses resolusi terbuka",
       "Bonus +5 MVP Point Leaderboard",
-      "Alokasi hingga 400 Kredit per bulan",
-      "Prioritas kompilasi server tercepat (di utamakan)",
+      "Alokasi hingga 400 Kredit per bulan (Reset tiap bulan, total 4.800 kredit/tahun)",
+      "Konsumsi: Foto (1-2 Kredit), Video (5-15 Kredit)",
+      "Prioritas kompilasi server tercepat (diutamakan)",
       "Akses eksklusif versi mendatang & beta",
-      "Cocok untuk Content Creator",
-      "Dukungan Prioritas 24/7",
+      "Support Prioritas 24/7",
     ],
   },
 ];
@@ -293,6 +295,11 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
             </div>
           </div>
         )}
+
+        <p className="text-[10px] text-muted-foreground leading-snug text-center">
+          Catatan: Kredit di-reset setiap bulan dan tidak diakumulasikan. Konsumsi kredit: Foto
+          720p-1080p (1 cr), Foto 2K-4K (2 cr), Video 1080p (5 cr), Video 2K-4K (15 cr).
+        </p>
 
         <p className="text-[10px] text-muted-foreground leading-snug text-center">
           (NOTE) Nominal harga yang tertera sudah harga akhir, dan untuk kenyamanan bersama harga akan
