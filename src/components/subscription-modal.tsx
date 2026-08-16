@@ -297,6 +297,11 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
         )}
 
         <p className="text-[10px] text-muted-foreground leading-snug text-center">
+          Catatan: Kredit di-reset setiap bulan dan tidak diakumulasikan. Konsumsi kredit: Foto
+          720p-1080p (1 cr), Foto 2K-4K (2 cr), Video 1080p (5 cr), Video 2K-4K (15 cr).
+        </p>
+
+        <p className="text-[10px] text-muted-foreground leading-snug text-center">
           (NOTE) Nominal harga yang tertera sudah harga akhir, dan untuk kenyamanan bersama harga akan
           terus di update lewat komunitas sesuai dengan pasar
         </p>
