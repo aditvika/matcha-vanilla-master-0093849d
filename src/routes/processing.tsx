@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { RequireAuth } from "@/components/require-auth";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Zap, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
+import { useCredits } from "@/hooks/use-credits";
+import { processMedia } from "@/lib/media-pipeline.functions";
 
 const searchSchema = z.object({
   resolution: z.string(),
+  path: z.string(),
 });
 
 export const Route = createFileRoute("/processing")({
@@ -40,15 +45,18 @@ const PREMIUM_MESSAGES = [
 function ProcessingPage() {
   const { media } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
-  const { resolution } = Route.useSearch();
+  const { refresh: refreshCredits } = useCredits();
+  const { resolution, path } = Route.useSearch();
   const navigate = useNavigate();
+  const runPipeline = useServerFn(processMedia);
   const [progress, setProgress] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
-  const doneRef = useRef(false);
+  const startedRef = useRef(false);
 
   const duration = isPremium ? 4000 : 30000;
   const messages = isPremium ? PREMIUM_MESSAGES : FREE_MESSAGES;
 
+  // Progress + message animation (visual only).
   useEffect(() => {
     if (!media) {
       void navigate({ to: "/home", replace: true });
@@ -57,24 +65,72 @@ function ProcessingPage() {
     const start = Date.now();
     const tick = setInterval(() => {
       const elapsed = Date.now() - start;
-      const pct = Math.min(100, (elapsed / duration) * 100);
-      setProgress(pct);
-      if (pct >= 100 && !doneRef.current) {
-        doneRef.current = true;
-        clearInterval(tick);
-        setTimeout(() => {
-          void navigate({ to: "/result", search: { resolution }, replace: true });
-        }, 350);
-      }
+      setProgress(Math.min(97, (elapsed / duration) * 100));
     }, 100);
-    const msgTick = setInterval(() => {
-      setMsgIdx((i) => (i + 1) % messages.length);
-    }, isPremium ? 1200 : 3500);
+    const msgTick = setInterval(
+      () => setMsgIdx((i) => (i + 1) % messages.length),
+      isPremium ? 1200 : 3500,
+    );
     return () => {
       clearInterval(tick);
       clearInterval(msgTick);
     };
-  }, [duration, isPremium, media, messages.length, navigate, resolution]);
+  }, [duration, isPremium, media, messages.length, navigate]);
+
+  // Real pipeline execution (free engine vs Fal.ai is decided server-side).
+  useEffect(() => {
+    if (!media || startedRef.current) return;
+    startedRef.current = true;
+
+    void (async () => {
+      try {
+        const result = await runPipeline({
+          data: {
+            path,
+            kind: media.kind,
+            resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+          },
+        });
+
+        void refreshCredits();
+
+        if (!result.ok) {
+          if (result.reason === "RATE_LIMIT" || result.reason === "TIMEOUT") {
+            toast.error(
+              "Server gratisan sedang padat. Silakan coba beberapa saat lagi atau upgrade ke VIP untuk akses server kilat.",
+              { duration: 7000 },
+            );
+          } else if (result.reason === "LOCKED") {
+            toast.error(
+              "Kredit harian Anda habis. Upgrade ke VIP untuk akses tanpa batas & kualitas 4K!",
+            );
+          } else {
+            toast.error(
+              result.refunded
+                ? "Gagal memproses media. Kredit Anda telah dikembalikan."
+                : "Gagal memproses media. Silakan coba lagi.",
+              { duration: 6000 },
+            );
+          }
+          void navigate({ to: "/preview", replace: true });
+          return;
+        }
+
+        setProgress(100);
+        setTimeout(() => {
+          void navigate({
+            to: "/result",
+            search: { resolution, output: result.outputUrl },
+            replace: true,
+          });
+        }, 350);
+      } catch {
+        toast.error("Gagal memproses media. Kredit Anda telah dikembalikan.");
+        void refreshCredits();
+        void navigate({ to: "/preview", replace: true });
+      }
+    })();
+  }, [media, navigate, path, refreshCredits, resolution, runPipeline]);
 
   if (!media) return null;
 

@@ -5,11 +5,14 @@ import { ArrowLeft, Lock, Sparkles, Wand2, Video } from "lucide-react";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useCredits } from "@/hooks/use-credits";
+import { useSupabaseSession } from "@/hooks/use-supabase-session";
+import { uploadSourceMedia } from "@/lib/media-upload";
 
 import { PremiumModal } from "@/components/premium-modal";
 import { SubscriptionModal } from "@/components/subscription-modal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/preview")({
   head: () => ({
@@ -36,6 +39,7 @@ function PreviewPage() {
   const { media, clear } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
   const { findRate, poolFor, refresh: refreshCredits } = useCredits();
+  const { user } = useSupabaseSession();
 
   const navigate = useNavigate();
   const [premiumOpen, setPremiumOpen] = useState(false);
@@ -61,7 +65,7 @@ function PreviewPage() {
       key: res,
       label: res,
       sub: locked
-        ? "Premium Only"
+        ? "Fitur VIP"
         : cost !== null
           ? `${cost} credit${cost > 1 ? "s" : ""} · ${pool?.remaining ?? 0} left`
           : isPremium
@@ -74,8 +78,22 @@ function PreviewPage() {
   const HeadingIcon = isVideo ? Video : Wand2;
   const heading = isVideo ? "Upscale Video" : "Enhance Photo";
 
+  const outOfCredits = () => {
+    toast.error(
+      "Kredit harian Anda habis. Upgrade ke VIP untuk akses tanpa batas & kualitas 4K!",
+      { duration: 6000 },
+    );
+    setSubOpen(true);
+  };
+
   const handleOption = (opt: Option) => {
     if (opt.locked) {
+      if (!isPremium) {
+        toast.error(
+          "Kredit harian Anda habis. Upgrade ke VIP untuk akses tanpa batas & kualitas 4K!",
+          { duration: 5000 },
+        );
+      }
       setPremiumOpen(true);
       return;
     }
@@ -88,7 +106,7 @@ function PreviewPage() {
   };
 
   const handleProcess = async () => {
-    if (!selected || processing) return;
+    if (!selected || processing || !user) return;
 
     setProcessing(true);
     try {
@@ -115,25 +133,36 @@ function PreviewPage() {
         if (res?.reason === "LOCKED") {
           setPremiumOpen(true);
         } else {
-          toast.error(
-            `Not enough credits (need ${res?.cost ?? 1}, ${res?.remaining ?? 0} left). Upgrade or redeem a voucher for more.`,
-            {
-              duration: 6000,
-              action: { label: "Upgrade", onClick: () => setSubOpen(true) },
-            },
-          );
+          outOfCredits();
         }
         setProcessing(false);
         return;
       }
-      void refreshCredits();
-      void navigate({ to: "/processing", search: { resolution: selected } });
 
+      let path: string;
+      try {
+        path = await uploadSourceMedia(media.file, user.id);
+      } catch {
+        // Upload failed after deduction — hand the credits straight back.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.rpc as any)("refund_credits", {
+          p_kind: kind,
+          p_resolution: selected,
+        });
+        void refreshCredits();
+        toast.error("Gagal mengunggah media. Kredit Anda telah dikembalikan.");
+        setProcessing(false);
+        return;
+      }
+
+      void refreshCredits();
+      void navigate({ to: "/processing", search: { resolution: selected, path } });
     } catch {
       toast.error("Something went wrong. Please try again.");
       setProcessing(false);
     }
   };
+
 
 
   return (

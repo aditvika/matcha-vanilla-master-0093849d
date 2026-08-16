@@ -180,6 +180,10 @@ export type Database = {
           tier: string
         }[]
       }
+      refund_credits: {
+        Args: { p_kind: string; p_resolution: string }
+        Returns: Json
+      }
       reset_daily_counts_if_new_day: { Args: never; Returns: Json }
     }
     Enums: {

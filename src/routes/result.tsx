@@ -6,7 +6,7 @@ import { ArrowLeft, Download, CheckCircle2 } from "lucide-react";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 
-const searchSchema = z.object({ resolution: z.string() });
+const searchSchema = z.object({ resolution: z.string(), output: z.string().optional() });
 
 export const Route = createFileRoute("/result")({
   validateSearch: (s) => searchSchema.parse(s),
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/result")({
 function ResultPage() {
   const { media, clear } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
-  const { resolution } = Route.useSearch();
+  const { resolution, output } = Route.useSearch();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,10 +41,11 @@ function ResultPage() {
     void navigate({ to: "/home" });
   };
 
+  const outUrl = output ?? media.url;
+
   const handleDownload = () => {
-    // Placeholder: download original file
     const a = document.createElement("a");
-    a.href = media.url;
+    a.href = outUrl;
     a.download = `enhanced_${resolution}_${media.file.name}`;
     a.click();
   };
@@ -65,9 +66,9 @@ function ResultPage() {
       <section className="result-stage">
         <div className="result-frame">
           {isVideo ? (
-            <video src={media.url} className="result-media" controls playsInline />
+            <video src={outUrl} className="result-media" controls playsInline />
           ) : (
-            <img src={media.url} alt="Processed result" className="result-media" />
+            <img src={outUrl} alt="Processed result" className="result-media" />
           )}
         </div>
         <p className="result-caption">Enhanced to {resolution} · {media.file.name}</p>
