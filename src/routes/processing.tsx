@@ -7,7 +7,7 @@ import { Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
-import { useCredits } from "@/hooks/use-credits";
+import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
 import { processMedia } from "@/lib/media-pipeline.functions";
 
 const searchSchema = z.object({
