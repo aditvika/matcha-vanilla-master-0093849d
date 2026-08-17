@@ -38,7 +38,7 @@ type Option = {
 function PreviewPage() {
   const { media, clear } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
-  const { findRate, poolFor, refresh: refreshCredits } = useCredits();
+  const { findRate, poolFor } = useCredits();
   const { user } = useSupabaseSession();
 
   const navigate = useNavigate();
