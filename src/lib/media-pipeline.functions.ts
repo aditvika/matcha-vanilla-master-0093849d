@@ -9,17 +9,22 @@ const inputSchema = z.object({
 });
 
 export type ProcessMediaResult =
-  | { ok: true; outputUrl: string; engine: "huggingface" | "fal" | "client"; tier: string }
+  | {
+      ok: true;
+      outputUrl: string;
+      engine: "huggingface" | "fal" | "client";
+      tier: string;
+      charged: number;
+    }
   | {
       ok: false;
-      reason: "RATE_LIMIT" | "TIMEOUT" | "MISSING_KEY" | "FAILED" | "LOCKED";
-      refunded: boolean;
+      reason: "RATE_LIMIT" | "TIMEOUT" | "MISSING_KEY" | "FAILED" | "LOCKED" | "INSUFFICIENT_CREDITS";
     };
 
 /**
- * Single entry point for both pipelines. The tier is resolved server-side, so a
- * free account can never reach Fal.ai and a VIP account never hits the free
- * engine. Any engine failure on a paid job refunds the deducted credits.
+ * Single entry point for both pipelines. Credits are NEVER deducted up-front:
+ * we only check affordability, run the engine, and charge after a successful
+ * result. A failed engine call therefore leaves the balance untouched.
  */
 export const processMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -31,35 +36,32 @@ export const processMedia = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rpc = supabase.rpc as any;
 
-    const refund = async () => {
-      const { data: r } = await rpc("refund_credits", {
-        p_kind: kind,
-        p_resolution: resolution,
-      });
-      return Boolean((r as { success?: boolean } | null)?.success);
-    };
-
+    // ---- STEP 1: check only, no deduction ----
     const { data: status } = await rpc("get_credit_status");
-    const tier = String((status as { tier?: string } | null)?.tier ?? "free");
+    const s = (status ?? {}) as {
+      tier?: string;
+      pools?: { key: string; limit: number; used: number; remaining: number }[];
+      rates?: { kind: string; resolution: string; locked: boolean; cost: number | null }[];
+    };
+    const tier = String(s.tier ?? "free");
     const isPaid = tier !== "free";
 
-    // Free tier can never request premium-only resolutions.
-    if (!isPaid) {
-      const photoAllowed = kind === "photo" && (resolution === "720p" || resolution === "1080p");
-      const videoAllowed = kind === "video" && resolution === "720p";
-      if (!photoAllowed && !videoAllowed) {
-        // Credits were already deducted client-side before this call.
-        return { ok: false, reason: "LOCKED", refunded: await refund() };
-      }
+    const rate = (s.rates ?? []).find((r) => r.kind === kind && r.resolution === resolution);
+    if (!rate || rate.locked || rate.cost === null) {
+      return { ok: false, reason: "LOCKED" };
     }
-
+    const poolKey = isPaid ? "credits" : kind;
+    const pool = (s.pools ?? []).find((p) => p.key === poolKey);
+    if (pool && pool.remaining < rate.cost) {
+      return { ok: false, reason: "INSUFFICIENT_CREDITS" };
+    }
 
     const { data: signed, error: signErr } = await supabase.storage
       .from("mv-media")
       .createSignedUrl(path, 60 * 30);
 
     if (signErr || !signed?.signedUrl) {
-      return { ok: false, reason: "FAILED", refunded: await refund() };
+      return { ok: false, reason: "FAILED" };
     }
     const sourceUrl = signed.signedUrl;
 
@@ -69,34 +71,47 @@ export const processMedia = createServerFn({ method: "POST" })
       runFreePhotoEngine,
     } = await import("./media-pipeline.server");
 
+    // ---- STEP 2: run the engine ----
+    let outputUrl: string;
+    let engine: "huggingface" | "fal" | "client";
     try {
-      // ---- FREE PIPELINE (never Fal.ai) ----
       if (!isPaid) {
         if (kind === "video") {
-          // Lightweight client-side path; no server-side transcode to avoid timeouts.
-          return { ok: true, outputUrl: sourceUrl, engine: "client", tier };
+          // Lightweight client-side path; no server-side transcode.
+          outputUrl = sourceUrl;
+          engine = "client";
+        } else {
+          const bytes = await runFreePhotoEngine(sourceUrl);
+          const outPath = `${userId}/out-${Date.now()}.png`;
+          const { error: upErr } = await supabase.storage
+            .from("mv-media")
+            .upload(outPath, bytes, { contentType: "image/png", upsert: true });
+          if (upErr) throw new EngineError(upErr.message, "FAILED");
+          const { data: outSigned } = await supabase.storage
+            .from("mv-media")
+            .createSignedUrl(outPath, 60 * 60);
+          if (!outSigned?.signedUrl) throw new EngineError("No signed output URL", "FAILED");
+          outputUrl = outSigned.signedUrl;
+          engine = "huggingface";
         }
-        const bytes = await runFreePhotoEngine(sourceUrl);
-        const outPath = `${userId}/out-${Date.now()}.png`;
-        const { error: upErr } = await supabase.storage
-          .from("mv-media")
-          .upload(outPath, bytes, { contentType: "image/png", upsert: true });
-        if (upErr) throw new EngineError(upErr.message, "FAILED");
-        const { data: outSigned } = await supabase.storage
-          .from("mv-media")
-          .createSignedUrl(outPath, 60 * 60);
-        if (!outSigned?.signedUrl) throw new EngineError("No signed output URL", "FAILED");
-        return { ok: true, outputUrl: outSigned.signedUrl, engine: "huggingface", tier };
+      } else {
+        outputUrl = await runFalEngine(kind, resolution, sourceUrl);
+        engine = "fal";
       }
-
-      // ---- PAID VIP PIPELINE (Fal.ai only) ----
-      const outputUrl = await runFalEngine(kind, resolution, sourceUrl);
-      return { ok: true, outputUrl, engine: "fal", tier };
     } catch (err) {
-      const reason =
-        err instanceof EngineError ? err.reason : ("FAILED" as const);
+      const reason = err instanceof EngineError ? err.reason : ("FAILED" as const);
       console.error("[media-pipeline]", tier, kind, resolution, reason, err);
-      // Paid credits are always returned; free daily quota is restored too.
-      return { ok: false, reason, refunded: await refund() };
+      // STEP 3A: nothing was ever charged, so nothing to refund.
+      return { ok: false, reason };
     }
+
+    // ---- STEP 3B: success -> charge now ----
+    const { data: charge } = await rpc("consume_credits", {
+      p_kind: kind,
+      p_resolution: resolution,
+    });
+    const c = (charge ?? {}) as { success?: boolean; cost?: number };
+
+    return { ok: true, outputUrl, engine, tier, charged: c.success ? Number(c.cost ?? 0) : 0 };
   });
+
