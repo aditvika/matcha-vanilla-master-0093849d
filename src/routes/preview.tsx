@@ -139,6 +139,9 @@ function PreviewPage() {
         return;
       }
 
+      // Deduction is committed on the server; sync the UI immediately.
+      broadcastCreditsChanged();
+
       let path: string;
       try {
         path = await uploadSourceMedia(media.file, user.id);
@@ -149,14 +152,16 @@ function PreviewPage() {
           p_kind: kind,
           p_resolution: selected,
         });
-        void refreshCredits();
+        await refreshCreditsGlobal();
+        broadcastCreditsChanged();
         toast.error("Gagal mengunggah media. Kredit Anda telah dikembalikan.");
         setProcessing(false);
         return;
       }
 
-      void refreshCredits();
+      await refreshCreditsGlobal();
       void navigate({ to: "/processing", search: { resolution: selected, path } });
+
     } catch {
       toast.error("Something went wrong. Please try again.");
       setProcessing(false);
