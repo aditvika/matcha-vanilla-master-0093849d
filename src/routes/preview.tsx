@@ -4,7 +4,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Lock, Sparkles, Wand2, Video } from "lucide-react";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
-import { useCredits } from "@/hooks/use-credits";
+import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
 import { useSupabaseSession } from "@/hooks/use-supabase-session";
 import { uploadSourceMedia } from "@/lib/media-upload";
 
