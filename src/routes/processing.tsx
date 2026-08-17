@@ -45,7 +45,7 @@ const PREMIUM_MESSAGES = [
 function ProcessingPage() {
   const { media } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
-  const { refresh: refreshCredits } = useCredits();
+  useCredits();
   const { resolution, path } = Route.useSearch();
   const navigate = useNavigate();
   const runPipeline = useServerFn(processMedia);
