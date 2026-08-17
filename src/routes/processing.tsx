@@ -102,17 +102,14 @@ function ProcessingPage() {
               "Server gratisan sedang padat. Silakan coba beberapa saat lagi atau upgrade ke VIP untuk akses server kilat.",
               { duration: 7000 },
             );
-          } else if (result.reason === "LOCKED") {
+          } else if (result.reason === "LOCKED" || result.reason === "INSUFFICIENT_CREDITS") {
             toast.error(
               "Kredit harian Anda habis. Upgrade ke VIP untuk akses tanpa batas & kualitas 4K!",
             );
           } else {
-            toast.error(
-              result.refunded
-                ? "Gagal memproses media. Kredit Anda telah dikembalikan."
-                : "Gagal memproses media. Silakan coba lagi.",
-              { duration: 6000 },
-            );
+            toast.error("Gagal memproses media. Kredit Anda tidak terpotong.", {
+              duration: 6000,
+            });
           }
           void navigate({ to: "/preview", replace: true });
           return;
@@ -127,13 +124,13 @@ function ProcessingPage() {
           });
         }, 350);
       } catch {
-        // Network/RPC failure: the server may have refunded already, so pull
-        // the authoritative balance before telling the user.
+        // Nothing is charged before a successful result, so the balance is intact.
         await refreshCreditsGlobal();
         broadcastCreditsChanged();
-        toast.error("Gagal memproses media. Kredit Anda telah dikembalikan.");
+        toast.error("Gagal memproses media. Kredit Anda tidak terpotong.");
         void navigate({ to: "/preview", replace: true });
       }
+
     })();
   }, [media, navigate, path, resolution, runPipeline]);
 

@@ -4,13 +4,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Lock, Sparkles, Wand2, Video } from "lucide-react";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
-import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
+import { useCredits } from "@/hooks/use-credits";
 import { useSupabaseSession } from "@/hooks/use-supabase-session";
 import { uploadSourceMedia } from "@/lib/media-upload";
 
 import { PremiumModal } from "@/components/premium-modal";
 import { SubscriptionModal } from "@/components/subscription-modal";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 
@@ -108,65 +107,37 @@ function PreviewPage() {
   const handleProcess = async () => {
     if (!selected || processing || !user) return;
 
+    // STEP 1 — check only. Credits are never deducted here; the server deducts
+    // after the engine returns a successful result.
+    const rate = findRate(kind, selected as "720p" | "1080p" | "2K" | "4K");
+    if (!rate || rate.locked || rate.cost === null) {
+      setPremiumOpen(true);
+      return;
+    }
+    const pool = poolFor(kind);
+    if (pool && pool.remaining < rate.cost) {
+      outOfCredits();
+      return;
+    }
+
     setProcessing(true);
     try {
-      const kind = isVideo ? "video" : "photo";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("consume_credits", {
-        p_kind: kind,
-        p_resolution: selected,
-      });
-      if (error) {
-        toast.error("Could not verify your credits. Please try again.");
-        setProcessing(false);
-        return;
-      }
-      const res = data as {
-        success: boolean;
-        reason?: string;
-        cost?: number;
-        limit?: number;
-        remaining?: number;
-        period_end?: string;
-      };
-      if (!res?.success) {
-        if (res?.reason === "LOCKED") {
-          setPremiumOpen(true);
-        } else {
-          outOfCredits();
-        }
-        setProcessing(false);
-        return;
-      }
-
-      // Deduction is committed on the server; sync the UI immediately.
-      broadcastCreditsChanged();
-
       let path: string;
       try {
         path = await uploadSourceMedia(media.file, user.id);
       } catch {
-        // Upload failed after deduction — hand the credits straight back.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.rpc as any)("refund_credits", {
-          p_kind: kind,
-          p_resolution: selected,
-        });
-        await refreshCreditsGlobal();
-        broadcastCreditsChanged();
-        toast.error("Gagal mengunggah media. Kredit Anda telah dikembalikan.");
+        toast.error("Gagal mengunggah media. Silakan coba lagi.");
         setProcessing(false);
         return;
       }
 
-      await refreshCreditsGlobal();
       void navigate({ to: "/processing", search: { resolution: selected, path } });
-
     } catch {
       toast.error("Something went wrong. Please try again.");
       setProcessing(false);
     }
   };
+
 
 
 
