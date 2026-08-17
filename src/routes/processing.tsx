@@ -7,7 +7,7 @@ import { Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
-import { useCredits } from "@/hooks/use-credits";
+import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
 import { processMedia } from "@/lib/media-pipeline.functions";
 
 const searchSchema = z.object({
@@ -45,7 +45,7 @@ const PREMIUM_MESSAGES = [
 function ProcessingPage() {
   const { media } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
-  const { refresh: refreshCredits } = useCredits();
+  useCredits();
   const { resolution, path } = Route.useSearch();
   const navigate = useNavigate();
   const runPipeline = useServerFn(processMedia);
@@ -92,7 +92,9 @@ function ProcessingPage() {
           },
         });
 
-        void refreshCredits();
+        // Always resync from the server clock/balance, refund or not.
+        await refreshCreditsGlobal();
+        broadcastCreditsChanged();
 
         if (!result.ok) {
           if (result.reason === "RATE_LIMIT" || result.reason === "TIMEOUT") {
@@ -125,12 +127,16 @@ function ProcessingPage() {
           });
         }, 350);
       } catch {
+        // Network/RPC failure: the server may have refunded already, so pull
+        // the authoritative balance before telling the user.
+        await refreshCreditsGlobal();
+        broadcastCreditsChanged();
         toast.error("Gagal memproses media. Kredit Anda telah dikembalikan.");
-        void refreshCredits();
         void navigate({ to: "/preview", replace: true });
       }
     })();
-  }, [media, navigate, path, refreshCredits, resolution, runPipeline]);
+  }, [media, navigate, path, resolution, runPipeline]);
+
 
   if (!media) return null;
 

@@ -4,7 +4,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Lock, Sparkles, Wand2, Video } from "lucide-react";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
-import { useCredits } from "@/hooks/use-credits";
+import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
 import { useSupabaseSession } from "@/hooks/use-supabase-session";
 import { uploadSourceMedia } from "@/lib/media-upload";
 
@@ -38,7 +38,7 @@ type Option = {
 function PreviewPage() {
   const { media, clear } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
-  const { findRate, poolFor, refresh: refreshCredits } = useCredits();
+  const { findRate, poolFor } = useCredits();
   const { user } = useSupabaseSession();
 
   const navigate = useNavigate();
@@ -139,6 +139,9 @@ function PreviewPage() {
         return;
       }
 
+      // Deduction is committed on the server; sync the UI immediately.
+      broadcastCreditsChanged();
+
       let path: string;
       try {
         path = await uploadSourceMedia(media.file, user.id);
@@ -149,14 +152,16 @@ function PreviewPage() {
           p_kind: kind,
           p_resolution: selected,
         });
-        void refreshCredits();
+        await refreshCreditsGlobal();
+        broadcastCreditsChanged();
         toast.error("Gagal mengunggah media. Kredit Anda telah dikembalikan.");
         setProcessing(false);
         return;
       }
 
-      void refreshCredits();
+      await refreshCreditsGlobal();
       void navigate({ to: "/processing", search: { resolution: selected, path } });
+
     } catch {
       toast.error("Something went wrong. Please try again.");
       setProcessing(false);

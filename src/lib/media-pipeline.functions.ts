@@ -48,9 +48,11 @@ export const processMedia = createServerFn({ method: "POST" })
       const photoAllowed = kind === "photo" && (resolution === "720p" || resolution === "1080p");
       const videoAllowed = kind === "video" && resolution === "720p";
       if (!photoAllowed && !videoAllowed) {
-        return { ok: false, reason: "LOCKED", refunded: false };
+        // Credits were already deducted client-side before this call.
+        return { ok: false, reason: "LOCKED", refunded: await refund() };
       }
     }
+
 
     const { data: signed, error: signErr } = await supabase.storage
       .from("mv-media")
