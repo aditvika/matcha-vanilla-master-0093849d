@@ -4,13 +4,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Lock, Sparkles, Wand2, Video } from "lucide-react";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
-import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
+import { useCredits } from "@/hooks/use-credits";
 import { useSupabaseSession } from "@/hooks/use-supabase-session";
 import { uploadSourceMedia } from "@/lib/media-upload";
 
 import { PremiumModal } from "@/components/premium-modal";
 import { SubscriptionModal } from "@/components/subscription-modal";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 
@@ -107,8 +106,6 @@ function PreviewPage() {
 
   const handleProcess = async () => {
     if (!selected || processing || !user) return;
-
-    const kind = isVideo ? "video" : "photo";
 
     // STEP 1 — check only. Credits are never deducted here; the server deducts
     // after the engine returns a successful result.
