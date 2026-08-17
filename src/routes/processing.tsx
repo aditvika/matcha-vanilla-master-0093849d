@@ -92,7 +92,9 @@ function ProcessingPage() {
           },
         });
 
-        void refreshCredits();
+        // Always resync from the server clock/balance, refund or not.
+        await refreshCreditsGlobal();
+        broadcastCreditsChanged();
 
         if (!result.ok) {
           if (result.reason === "RATE_LIMIT" || result.reason === "TIMEOUT") {
@@ -125,12 +127,16 @@ function ProcessingPage() {
           });
         }, 350);
       } catch {
+        // Network/RPC failure: the server may have refunded already, so pull
+        // the authoritative balance before telling the user.
+        await refreshCreditsGlobal();
+        broadcastCreditsChanged();
         toast.error("Gagal memproses media. Kredit Anda telah dikembalikan.");
-        void refreshCredits();
         void navigate({ to: "/preview", replace: true });
       }
     })();
-  }, [media, navigate, path, refreshCredits, resolution, runPipeline]);
+  }, [media, navigate, path, resolution, runPipeline]);
+
 
   if (!media) return null;
 
