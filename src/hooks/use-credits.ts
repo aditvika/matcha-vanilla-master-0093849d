@@ -38,52 +38,104 @@ const EMPTY: CreditStatus = {
 };
 
 /**
+ * Shared, module-level credit store so every mounted `useCredits()` consumer
+ * (quota panel, preview screen, processing screen) reads the same balance and
+ * refreshes together. Without this, a refund refreshed only one component.
+ */
+let sharedStatus: CreditStatus = EMPTY;
+let sharedSkew = 0;
+let inFlight: Promise<void> | null = null;
+const subscribers = new Set<() => void>();
+
+function notify() {
+  subscribers.forEach((fn) => fn());
+}
+
+async function loadStatus(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("get_credit_status");
+  if (!error && data) {
+    const d = data as Record<string, unknown>;
+    const serverTime = (d.server_time as string) ?? null;
+    if (serverTime) sharedSkew = new Date(serverTime).getTime() - Date.now();
+    sharedStatus = {
+      tier: (d.tier as CreditTier) ?? "free",
+      serverTime,
+      periodStart: (d.period_start as string) ?? null,
+      periodEnd: (d.period_end as string) ?? null,
+      pools: ((d.pools as CreditPool[]) ?? []).map((p) => ({
+        ...p,
+        limit: Number(p.limit ?? 0),
+        used: Number(p.used ?? 0),
+        remaining: Number(p.remaining ?? 0),
+      })),
+      rates: ((d.rates as CreditRate[]) ?? []).map((r) => ({
+        ...r,
+        cost: r.cost === null || r.cost === undefined ? null : Number(r.cost),
+      })),
+    };
+  }
+  notify();
+}
+
+/** Refetch credits once and broadcast to every consumer. Safe to call anywhere. */
+export async function refreshCreditsGlobal(): Promise<void> {
+  if (!inFlight) {
+    inFlight = loadStatus().finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("mv:credits-updated", () => void refreshCreditsGlobal());
+}
+
+/** Fire-and-forget broadcast used after a deduction or a refund. */
+export function broadcastCreditsChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("mv:credits-updated"));
+  } else {
+    void refreshCreditsGlobal();
+  }
+}
+
+/**
  * Credit state is fully server-driven: pools, costs and the reset window all
  * come from the database clock, so changing the device date has no effect.
  */
 export function useCredits() {
   const { user } = useSupabaseSession();
-  const [status, setStatus] = useState<CreditStatus>(EMPTY);
+  const [, setVersion] = useState(0);
   const [loading, setLoading] = useState(true);
-  /** Milliseconds of drift between the device clock and the server clock. */
-  const [skewMs, setSkewMs] = useState(0);
+
+  useEffect(() => {
+    const cb = () => setVersion((v) => v + 1);
+    subscribers.add(cb);
+    return () => {
+      subscribers.delete(cb);
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!user) {
-      setStatus(EMPTY);
+      sharedStatus = EMPTY;
+      sharedSkew = 0;
+      notify();
       setLoading(false);
       return;
     }
     setLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.rpc as any)("get_credit_status");
-    if (!error && data) {
-      const d = data as Record<string, unknown>;
-      const serverTime = (d.server_time as string) ?? null;
-      if (serverTime) setSkewMs(new Date(serverTime).getTime() - Date.now());
-      setStatus({
-        tier: (d.tier as CreditTier) ?? "free",
-        serverTime,
-        periodStart: (d.period_start as string) ?? null,
-        periodEnd: (d.period_end as string) ?? null,
-        pools: ((d.pools as CreditPool[]) ?? []).map((p) => ({
-          ...p,
-          limit: Number(p.limit ?? 0),
-          used: Number(p.used ?? 0),
-          remaining: Number(p.remaining ?? 0),
-        })),
-        rates: ((d.rates as CreditRate[]) ?? []).map((r) => ({
-          ...r,
-          cost: r.cost === null || r.cost === undefined ? null : Number(r.cost),
-        })),
-      });
-    }
+    await refreshCreditsGlobal();
     setLoading(false);
   }, [user]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const status = sharedStatus;
 
   const findRate = useCallback(
     (kind: CreditRate["kind"], resolution: CreditRate["resolution"]) =>
@@ -99,8 +151,9 @@ export function useCredits() {
     [status.pools, status.tier],
   );
 
-  return { ...status, skewMs, loading, refresh, findRate, poolFor };
+  return { ...status, skewMs: sharedSkew, loading, refresh, findRate, poolFor };
 }
+
 
 /** Countdown until the server-side reset, corrected for device clock drift. */
 export function useResetCountdown(periodEnd: string | null, skewMs: number) {
