@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/drawer";
 import { PremiumModal } from "@/components/premium-modal";
 import { SubscriptionModal } from "@/components/subscription-modal";
+import { HeroCarousel } from "@/components/hero-carousel";
+
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useI18n } from "@/hooks/use-i18n";
 
