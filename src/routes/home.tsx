@@ -198,7 +198,11 @@ function HomePage() {
           </button>
         </header>
 
+        {/* Hero carousel */}
+        <HeroCarousel isPremium={isPremium} onUpgrade={() => setPremiumOpen(true)} />
+
         {/* Featured card / Premium activated banner */}
+
         {isPremium ? (
           <div className="home-premium-banner" role="status" aria-live="polite">
             <div className="home-premium-banner-glow" aria-hidden />
