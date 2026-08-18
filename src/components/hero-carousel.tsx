@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import beforeAsset from "@/assets/showcase-before.jpg.asset.json";
 import afterAsset from "@/assets/showcase-after.jpg.asset.json";
 import officialAsset from "@/assets/banner-official.jpg.asset.json";
@@ -6,6 +6,7 @@ import supportAsset from "@/assets/banner-support.jpg.asset.json";
 
 const AUTOPLAY_MS = 4500;
 const SLIDE_COUNT = 3;
+const SWIPE_THRESHOLD = 45;
 
 type HeroCarouselProps = {
   isPremium: boolean;
@@ -14,23 +15,21 @@ type HeroCarouselProps = {
 
 export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [reveal, setReveal] = useState(0.5);
-  const scanRef = useRef<number | null>(null);
+  const [timerKey, setTimerKey] = useState(0);
+  const [reveal, setReveal] = useState(0);
+  const dragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
-  // Auto-play
+  // Auto-play (restarts whenever the user swipes)
   useEffect(() => {
-    if (paused) return;
     const id = window.setInterval(
       () => setIndex((i) => (i + 1) % SLIDE_COUNT),
       AUTOPLAY_MS,
     );
     return () => window.clearInterval(id);
-  }, [paused]);
+  }, [timerKey]);
 
-  // Auto-scanning divider on slide 1
+  // Infinite ping-pong scanner (never stops)
   useEffect(() => {
-    if (index !== 0 || paused) return;
     let raf = 0;
     const start = performance.now();
     const tick = (now: number) => {
@@ -39,27 +38,47 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    scanRef.current = raf;
     return () => cancelAnimationFrame(raf);
-  }, [index, paused]);
+  }, []);
 
-  const handleScrub = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      setReveal(Math.min(1, Math.max(0, x)));
-    },
-    [],
-  );
+  const goTo = (i: number) => {
+    setIndex(((i % SLIDE_COUNT) + SLIDE_COUNT) % SLIDE_COUNT);
+    setTimerKey((k) => k + 1);
+  };
 
-  const slide1Interactive = !isPremium;
+  const onPointerDown = (e: React.PointerEvent) => {
+    dragRef.current = { x: e.clientX, y: e.clientY, moved: false };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (Math.abs(e.clientX - d.x) > 8) d.moved = true;
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      goTo(index + (dx < 0 ? 1 : -1));
+      return;
+    }
+    if (!d.moved && index === 0 && !isPremium) onUpgrade();
+  };
 
   return (
     <section
       aria-label="Highlights"
-      className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.8)] backdrop-blur-md"
+      className="relative w-full overflow-hidden rounded-2xl"
     >
-      <div className="relative w-full aspect-video">
+      <div
+        className="relative w-full aspect-video touch-pan-y select-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => (dragRef.current = null)}
+      >
         {/* Slide 1 — before/after showcase */}
         <div
           className={`absolute inset-0 transition-opacity duration-700 ${
@@ -67,42 +86,29 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
           }`}
         >
           <div
-            role={slide1Interactive ? "button" : undefined}
-            tabIndex={slide1Interactive ? 0 : -1}
-            aria-label={slide1Interactive ? "Upgrade ke Premium" : undefined}
-            onClick={slide1Interactive ? onUpgrade : undefined}
+            role={!isPremium ? "button" : undefined}
+            tabIndex={!isPremium ? 0 : -1}
+            aria-label={!isPremium ? "Upgrade ke Premium" : undefined}
             onKeyDown={
-              slide1Interactive
+              !isPremium
                 ? (e) => {
                     if (e.key === "Enter" || e.key === " ") onUpgrade();
                   }
                 : undefined
             }
-            onPointerEnter={() => setPaused(true)}
-            onPointerLeave={() => {
-              setPaused(false);
-            }}
-            onPointerDown={(e) => {
-              setPaused(true);
-              handleScrub(e);
-            }}
-            onPointerMove={(e) => {
-              if (e.buttons > 0 || e.pointerType === "touch") handleScrub(e);
-            }}
             className={`relative h-full w-full select-none ${
-              slide1Interactive
-                ? "cursor-pointer transition-shadow hover:shadow-[inset_0_0_60px_rgba(168,85,247,0.35)]"
-                : "pointer-events-none"
+              !isPremium ? "cursor-pointer" : ""
             }`}
           >
             <img
               src={beforeAsset.url}
               alt="Hasil sebelum ditingkatkan"
-              className="absolute inset-0 h-full w-full object-cover"
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+              draggable={false}
               loading="lazy"
             />
             <div
-              className="absolute inset-0 overflow-hidden"
+              className="pointer-events-none absolute inset-0 overflow-hidden"
               style={{ width: `${reveal * 100}%` }}
             >
               <img
@@ -110,6 +116,7 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
                 alt="Hasil setelah ditingkatkan HD"
                 className="absolute inset-0 h-full w-full object-cover"
                 style={{ width: `${100 / Math.max(reveal, 0.001)}%` }}
+                draggable={false}
                 loading="lazy"
               />
             </div>
@@ -130,6 +137,9 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
           href="https://linktr.ee/ADVIK_owner"
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => {
+            if (dragRef.current?.moved) e.preventDefault();
+          }}
           className={`absolute inset-0 transition-opacity duration-700 ${
             index === 1 ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
@@ -138,7 +148,8 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
           <img
             src={officialAsset.url}
             alt="AV Studio Official"
-            className="h-full w-full object-cover"
+            className="pointer-events-none h-full w-full object-cover"
+            draggable={false}
             loading="lazy"
           />
         </a>
@@ -148,6 +159,9 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
           href="https://wa.me/62895365351729"
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => {
+            if (dragRef.current?.moved) e.preventDefault();
+          }}
           className={`absolute inset-0 transition-opacity duration-700 ${
             index === 2 ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
@@ -156,7 +170,8 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
           <img
             src={supportAsset.url}
             alt="Customer Support & Help Center"
-            className="h-full w-full object-cover"
+            className="pointer-events-none h-full w-full object-cover"
+            draggable={false}
             loading="lazy"
           />
         </a>
@@ -168,7 +183,7 @@ export function HeroCarousel({ isPremium, onUpgrade }: HeroCarouselProps) {
               key={i}
               type="button"
               aria-label={`Slide ${i + 1}`}
-              onClick={() => setIndex(i)}
+              onClick={() => goTo(i)}
               className={`h-1.5 rounded-full transition-all ${
                 i === index
                   ? "w-5 bg-primary shadow-[0_0_10px_2px_hsl(var(--primary)/0.7)]"
