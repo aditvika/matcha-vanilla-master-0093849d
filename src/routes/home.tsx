@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/drawer";
 import { PremiumModal } from "@/components/premium-modal";
 import { SubscriptionModal } from "@/components/subscription-modal";
+import { HeroCarousel } from "@/components/hero-carousel";
+
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useI18n } from "@/hooks/use-i18n";
 
@@ -198,7 +200,11 @@ function HomePage() {
           </button>
         </header>
 
+        {/* Hero carousel */}
+        <HeroCarousel isPremium={isPremium} onUpgrade={() => setPremiumOpen(true)} />
+
         {/* Featured card / Premium activated banner */}
+
         {isPremium ? (
           <div className="home-premium-banner" role="status" aria-live="polite">
             <div className="home-premium-banner-glow" aria-hidden />
