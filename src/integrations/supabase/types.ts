@@ -142,6 +142,7 @@ export type Database = {
         Returns: Json
       }
       consume_daily_credit: { Args: { p_kind: string }; Returns: Json }
+      consume_mvc: { Args: { p_amount: number; p_kind: string }; Returns: Json }
       consume_quota: {
         Args: { p_kind: string; p_resolution: string }
         Returns: Json
