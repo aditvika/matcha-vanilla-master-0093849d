@@ -7,8 +7,9 @@ import { useSelectedMedia } from "@/hooks/use-selected-media";
 import {
   Bell,
   Wand2,
-  UserRoundCog,
+  Eraser,
   Video,
+  Image as ImageIcon,
   FolderOpen,
   Home as HomeIcon,
   Plus,
@@ -42,6 +43,8 @@ import { HeroCarousel } from "@/components/hero-carousel";
 
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useI18n } from "@/hooks/use-i18n";
+import { useCredits } from "@/hooks/use-credits";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -68,7 +71,7 @@ type Service = {
 
 const services: Service[] = [
   { label: "Enhance Photo", key: "svc.enhancePhoto", Icon: Wand2 },
-  { label: "Face Swap", key: "svc.faceSwap", Icon: UserRoundCog },
+  { label: "Remove Watermark", key: "service.remove_watermark", Icon: Eraser },
   { label: "Upscale Video", key: "svc.upscaleVideo", Icon: Video },
   { label: "Project History", key: "svc.projectHistory", Icon: FolderOpen },
 ];
@@ -128,6 +131,7 @@ function HomePage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [faceSwapOpen, setFaceSwapOpen] = useState(false);
+  const [wmOpen, setWmOpen] = useState(false);
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [leaderTab, setLeaderTab] = useState<LeaderTab>("Bulanan");
@@ -157,9 +161,12 @@ function HomePage() {
   const navigate = useNavigate();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const wmPhotoRef = useRef<HTMLInputElement>(null);
+  const wmVideoRef = useRef<HTMLInputElement>(null);
+  const { poolFor } = useCredits();
 
   const handleServiceClick = (label: string) => {
-    if (label === "Face Swap") return setFaceSwapOpen(true);
+    if (label === "Remove Watermark") return setWmOpen(true);
     if (label === "Enhance Photo") return photoInputRef.current?.click();
     if (label === "Upscale Video") return videoInputRef.current?.click();
   };
@@ -171,6 +178,28 @@ function HomePage() {
     e.target.value = "";
     void navigate({ to: "/preview" });
   };
+
+  const startWatermark = (kind: "photo" | "video") => {
+    const cost = kind === "photo" ? 1 : 2;
+    const remaining = poolFor(kind)?.remaining ?? 0;
+    if (remaining < cost) {
+      toast.error(t("wm.insufficient"));
+      setWmOpen(false);
+      setSubOpen(true);
+      return;
+    }
+    setWmOpen(false);
+    (kind === "photo" ? wmPhotoRef : wmVideoRef).current?.click();
+  };
+
+  const handleWatermarkPicked =
+    (kind: "photo" | "video") => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setMedia(file, kind);
+      e.target.value = "";
+      void navigate({ to: "/watermark" });
+    };
 
   const openNotifications = () => {
     setNotifOpen(true);
@@ -275,6 +304,20 @@ function HomePage() {
             hidden
             onChange={handleFilePicked("video")}
           />
+          <input
+            ref={wmPhotoRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={handleWatermarkPicked("photo")}
+          />
+          <input
+            ref={wmVideoRef}
+            type="file"
+            accept="video/mp4,video/*"
+            hidden
+            onChange={handleWatermarkPicked("video")}
+          />
         </section>
 
         <QuotaPanel />
@@ -354,6 +397,30 @@ function HomePage() {
           <span>{t("nav.settings")}</span>
         </Link>
       </nav>
+
+      {/* Remove Watermark — media type modal */}
+      <Dialog open={wmOpen} onOpenChange={setWmOpen}>
+        <DialogContent className="coming-soon-dialog-content">
+          <DialogHeader>
+            <DialogTitle className="coming-soon-dialog-title">{t("wm.chooseType")}</DialogTitle>
+            <DialogDescription className="coming-soon-dialog-desc">
+              {t("wm.chooseTypeDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="wm-type-grid">
+            <button type="button" className="wm-type" onClick={() => startWatermark("photo")}>
+              <ImageIcon size={22} />
+              <span className="wm-type-label">{t("wm.image")}</span>
+              <span className="wm-type-cost">1 {t("wm.mvc")}</span>
+            </button>
+            <button type="button" className="wm-type" onClick={() => startWatermark("video")}>
+              <Video size={22} />
+              <span className="wm-type-label">{t("wm.video")}</span>
+              <span className="wm-type-cost">2 {t("wm.mvc")}</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Face Swap — Coming Soon modal */}
       <Dialog open={faceSwapOpen} onOpenChange={setFaceSwapOpen}>
