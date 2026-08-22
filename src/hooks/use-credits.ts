@@ -66,6 +66,8 @@ async function loadStatus(): Promise<void> {
       serverTime,
       periodStart: (d.period_start as string) ?? null,
       periodEnd: (d.period_end as string) ?? null,
+      mvcBalance: Number(d.mvc_balance ?? 0),
+
       pools: ((d.pools as CreditPool[]) ?? []).map((p) => ({
         ...p,
         limit: Number(p.limit ?? 0),
