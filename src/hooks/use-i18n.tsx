@@ -106,7 +106,31 @@ const en: Dict = {
   "wm.busy": "The engine is busy. Please try again shortly.",
   "wm.uploadFailed": "Upload failed. Please try again.",
   "wm.charged": "credits used",
+  // MVC market
+  "mvc.title": "Matcha Vanilla Coin (MVC) Market",
+  "mvc.subtitle": "Buy coins for Watermark Removal & Exclusive Features",
+  "mvc.modalTitle": "MVC Coin Packages",
+  "mvc.modalDesc": "Pick a pack and top up instantly via WhatsApp.",
+  "mvc.balance": "Your balance",
+  "mvc.coins": "MVC Coins",
+  "mvc.mini": "Mini Pack",
+  "mvc.popular": "Popular Pack",
+  "mvc.super": "Super Pack",
+  "mvc.bestSeller": "Best Seller",
+  "mvc.bestValue": "Best Value",
+  "mvc.topUp": "Top Up Now",
+  // admin injector
+  "admin.injectTitle": "Admin Injector",
+  "admin.injectDesc": "Add MVC balance to any user account",
+  "admin.targetEmail": "Target User Email",
+  "admin.amount": "MVC Amount",
+  "admin.injectBtn": "Inject MVC Balance",
+  "admin.injecting": "Injecting…",
+  "admin.injectSuccess": "MVC balance updated",
+  "admin.userNotFound": "No user found with that email",
+  "admin.injectFailed": "Failed to inject MVC balance",
 };
+
 
 const id: Dict = {
   "common.gotIt": "Mengerti",
