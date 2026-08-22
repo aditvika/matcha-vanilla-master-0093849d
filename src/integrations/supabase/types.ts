@@ -25,6 +25,7 @@ export type Database = {
           is_premium: boolean
           last_active_server_date: string | null
           monthly_video_count_premium: number
+          mvc_balance: number
           package_type: string | null
           premium_started_at: string | null
           premium_until: string | null
@@ -42,6 +43,7 @@ export type Database = {
           is_premium?: boolean
           last_active_server_date?: string | null
           monthly_video_count_premium?: number
+          mvc_balance?: number
           package_type?: string | null
           premium_started_at?: string | null
           premium_until?: string | null
@@ -59,6 +61,7 @@ export type Database = {
           is_premium?: boolean
           last_active_server_date?: string | null
           monthly_video_count_premium?: number
+          mvc_balance?: number
           package_type?: string | null
           premium_started_at?: string | null
           premium_until?: string | null
@@ -136,6 +139,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_inject_mvc: {
+        Args: { p_amount: number; p_email: string }
+        Returns: Json
+      }
       claim_voucher: { Args: { p_code: string }; Returns: Json }
       consume_credits: {
         Args: { p_kind: string; p_resolution: string }
