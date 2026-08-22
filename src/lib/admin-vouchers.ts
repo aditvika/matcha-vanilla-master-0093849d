@@ -114,6 +114,43 @@ export const checkIsAdminFn = createServerFn({ method: "GET" })
     return { isAdmin: email === ADMIN_EMAIL, email: email ?? null };
   });
 
+export const injectMvcFn = createServerFn({ method: "POST" })
+  .inputValidator((input: { email: string; amount: number }) => ({
+    email: String(input.email ?? "").trim().toLowerCase(),
+    amount: Math.max(-1000, Math.min(1000, Math.floor(Number(input.amount) || 0))),
+  }))
+  .middleware([requireSupabaseAuth])
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<{ success: boolean; reason?: string; balance?: number }> => {
+      await assertAdmin(context as AuthenticatedContext);
+      if (!data.email || !data.amount) return { success: false, reason: "INVALID_INPUT" };
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      const { data: profile, error } = await supabaseAdmin
+        .from("profiles")
+        .select("id, mvc_balance")
+        .ilike("email", data.email)
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!profile) return { success: false, reason: "USER_NOT_FOUND" };
+
+      const next = Math.max(0, Number(profile.mvc_balance ?? 0) + data.amount);
+      const { error: upErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ mvc_balance: next })
+        .eq("id", profile.id);
+      if (upErr) throw new Error(upErr.message);
+
+      return { success: true, balance: next };
+    },
+  );
+
+
 export const listSubscribersFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

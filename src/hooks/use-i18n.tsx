@@ -106,7 +106,31 @@ const en: Dict = {
   "wm.busy": "The engine is busy. Please try again shortly.",
   "wm.uploadFailed": "Upload failed. Please try again.",
   "wm.charged": "credits used",
+  // MVC market
+  "mvc.title": "Matcha Vanilla Coin (MVC) Market",
+  "mvc.subtitle": "Buy coins for Watermark Removal & Exclusive Features",
+  "mvc.modalTitle": "MVC Coin Packages",
+  "mvc.modalDesc": "Pick a pack and top up instantly via WhatsApp.",
+  "mvc.balance": "Your balance",
+  "mvc.coins": "MVC Coins",
+  "mvc.mini": "Mini Pack",
+  "mvc.popular": "Popular Pack",
+  "mvc.super": "Super Pack",
+  "mvc.bestSeller": "Best Seller",
+  "mvc.bestValue": "Best Value",
+  "mvc.topUp": "Top Up Now",
+  // admin injector
+  "admin.injectTitle": "Admin Injector",
+  "admin.injectDesc": "Add MVC balance to any user account",
+  "admin.targetEmail": "Target User Email",
+  "admin.amount": "MVC Amount",
+  "admin.injectBtn": "Inject MVC Balance",
+  "admin.injecting": "Injecting…",
+  "admin.injectSuccess": "MVC balance updated",
+  "admin.userNotFound": "No user found with that email",
+  "admin.injectFailed": "Failed to inject MVC balance",
 };
+
 
 const id: Dict = {
   "common.gotIt": "Mengerti",
@@ -202,7 +226,31 @@ const id: Dict = {
   "wm.busy": "Server sedang padat. Silakan coba lagi sebentar.",
   "wm.uploadFailed": "Gagal mengunggah media. Silakan coba lagi.",
   "wm.charged": "kredit terpakai",
+  // pasar MVC
+  "mvc.title": "Pasar Matcha Vanilla Coin (MVC)",
+  "mvc.subtitle": "Beli koin untuk fitur Remove Watermark & Akses Khusus",
+  "mvc.modalTitle": "Paket Koin MVC",
+  "mvc.modalDesc": "Pilih paket dan isi ulang langsung lewat WhatsApp.",
+  "mvc.balance": "Saldo kamu",
+  "mvc.coins": "Koin MVC",
+  "mvc.mini": "Paket Mini",
+  "mvc.popular": "Paket Populer",
+  "mvc.super": "Paket Super",
+  "mvc.bestSeller": "Terlaris",
+  "mvc.bestValue": "Paling Hemat",
+  "mvc.topUp": "Isi Ulang Sekarang",
+  // injector admin
+  "admin.injectTitle": "Admin Injector",
+  "admin.injectDesc": "Tambah saldo MVC ke akun pengguna mana pun",
+  "admin.targetEmail": "Email User Target",
+  "admin.amount": "Jumlah MVC",
+  "admin.injectBtn": "Suntik Saldo MVC",
+  "admin.injecting": "Menyuntik…",
+  "admin.injectSuccess": "Saldo MVC berhasil diperbarui",
+  "admin.userNotFound": "Pengguna dengan email itu tidak ditemukan",
+  "admin.injectFailed": "Gagal menyuntik saldo MVC",
 };
+
 
 const dicts: Record<Lang, Dict> = { en, id };
 
