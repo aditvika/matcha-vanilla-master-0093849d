@@ -53,8 +53,9 @@ async function withTimeout(input: string, init: RequestInit, ms: number) {
 
 /** FREE photo engine: Hugging Face Real-ESRGAN. Returns raw image bytes. */
 export async function runFreePhotoEngine(sourceUrl: string): Promise<ArrayBuffer> {
-  const token = process.env["HUGGINGFACE_TOKEN"];
-  if (!token) throw new EngineError("HUGGINGFACE_TOKEN missing", "MISSING_KEY");
+  const token = process.env["HF_TOKEN"] ?? process.env["HUGGINGFACE_TOKEN"];
+  if (!token) throw new EngineError("HF_TOKEN missing", "MISSING_KEY");
+
 
   const src = await withTimeout(sourceUrl, { method: "GET" }, 30_000);
   if (!src.ok) throw new EngineError("Could not read source media", "FAILED");

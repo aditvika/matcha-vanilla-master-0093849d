@@ -24,6 +24,7 @@ export type CreditStatus = {
   serverTime: string | null;
   periodStart: string | null;
   periodEnd: string | null;
+  mvcBalance: number;
   pools: CreditPool[];
   rates: CreditRate[];
 };
@@ -33,9 +34,11 @@ const EMPTY: CreditStatus = {
   serverTime: null,
   periodStart: null,
   periodEnd: null,
+  mvcBalance: 0,
   pools: [],
   rates: [],
 };
+
 
 /**
  * Shared, module-level credit store so every mounted `useCredits()` consumer
