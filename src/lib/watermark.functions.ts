@@ -39,18 +39,21 @@ export const removeWatermark = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rpc = supabase.rpc as any;
 
-    // ---- Step 1: affordability check only ----
+    // ---- Step 1: affordability check only (plan pool + MVC wallet) ----
     const { data: status } = await rpc("get_credit_status");
     const s = (status ?? {}) as {
       tier?: string;
+      mvc_balance?: number;
       pools?: { key: string; remaining: number }[];
     };
     const tier = String(s.tier ?? "free");
     const poolKey = tier === "free" ? kind : "credits";
     const pool = (s.pools ?? []).find((p) => p.key === poolKey);
-    if (pool && pool.remaining < cost) {
+    const wallet = Number(s.mvc_balance ?? 0);
+    if (pool && pool.remaining + wallet < cost) {
       return { ok: false, reason: "INSUFFICIENT_CREDITS" };
     }
+
 
     const { data: signed } = await supabase.storage
       .from("mv-media")
