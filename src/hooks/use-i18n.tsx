@@ -226,7 +226,31 @@ const id: Dict = {
   "wm.busy": "Server sedang padat. Silakan coba lagi sebentar.",
   "wm.uploadFailed": "Gagal mengunggah media. Silakan coba lagi.",
   "wm.charged": "kredit terpakai",
+  // pasar MVC
+  "mvc.title": "Pasar Matcha Vanilla Coin (MVC)",
+  "mvc.subtitle": "Beli koin untuk fitur Remove Watermark & Akses Khusus",
+  "mvc.modalTitle": "Paket Koin MVC",
+  "mvc.modalDesc": "Pilih paket dan isi ulang langsung lewat WhatsApp.",
+  "mvc.balance": "Saldo kamu",
+  "mvc.coins": "Koin MVC",
+  "mvc.mini": "Paket Mini",
+  "mvc.popular": "Paket Populer",
+  "mvc.super": "Paket Super",
+  "mvc.bestSeller": "Terlaris",
+  "mvc.bestValue": "Paling Hemat",
+  "mvc.topUp": "Isi Ulang Sekarang",
+  // injector admin
+  "admin.injectTitle": "Admin Injector",
+  "admin.injectDesc": "Tambah saldo MVC ke akun pengguna mana pun",
+  "admin.targetEmail": "Email User Target",
+  "admin.amount": "Jumlah MVC",
+  "admin.injectBtn": "Suntik Saldo MVC",
+  "admin.injecting": "Menyuntik…",
+  "admin.injectSuccess": "Saldo MVC berhasil diperbarui",
+  "admin.userNotFound": "Pengguna dengan email itu tidak ditemukan",
+  "admin.injectFailed": "Gagal menyuntik saldo MVC",
 };
+
 
 const dicts: Record<Lang, Dict> = { en, id };
 
