@@ -13,7 +13,7 @@ import { useCredits } from "@/hooks/use-credits";
 const WA_NUMBER = "62895365351729";
 
 type Pack = {
-  id: "mini" | "popular" | "super";
+  id: string;
   nameKey: string;
   coins: number;
   idr: string;
@@ -22,22 +22,35 @@ type Pack = {
 };
 
 const PACKS: Pack[] = [
-  { id: "mini", nameKey: "mvc.mini", coins: 5, idr: "Rp 10.000", usd: "$0.70" },
+  { id: "p5", nameKey: "mvc.pack5", coins: 5, idr: "Rp 10.000", usd: "$0.70" },
+  { id: "p10", nameKey: "mvc.pack10", coins: 10, idr: "Rp 18.000", usd: "$1.20" },
   {
-    id: "popular",
-    nameKey: "mvc.popular",
+    id: "p15",
+    nameKey: "mvc.pack15",
     coins: 15,
     idr: "Rp 25.000",
     usd: "$1.70",
     badgeKey: "mvc.bestSeller",
   },
+  { id: "p20", nameKey: "mvc.pack20", coins: 20, idr: "Rp 32.000", usd: "$2.10" },
+  { id: "p25", nameKey: "mvc.pack25", coins: 25, idr: "Rp 38.000", usd: "$2.50" },
+  { id: "p30", nameKey: "mvc.pack30", coins: 30, idr: "Rp 44.000", usd: "$2.90" },
+  { id: "p35", nameKey: "mvc.pack35", coins: 35, idr: "Rp 50.000", usd: "$3.30" },
   {
-    id: "super",
-    nameKey: "mvc.super",
+    id: "p50",
+    nameKey: "mvc.pack50",
     coins: 50,
     idr: "Rp 70.000",
     usd: "$4.50",
     badgeKey: "mvc.bestValue",
+  },
+  {
+    id: "p100",
+    nameKey: "mvc.pack100",
+    coins: 100,
+    idr: "Rp 130.000",
+    usd: "$8.50",
+    badgeKey: "mvc.sultanPack",
   },
 ];
 
