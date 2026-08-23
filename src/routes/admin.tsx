@@ -2,16 +2,18 @@ import { RequireAuth } from "@/components/require-auth";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Copy, RefreshCw, Ticket, Shield, Check, Crown } from "lucide-react";
+import { ArrowLeft, Copy, RefreshCw, Ticket, Shield, Check, Crown, Coins } from "lucide-react";
 import { toast } from "sonner";
 import {
   generateVouchersFn,
   listVouchersFn,
   listSubscribersFn,
   checkIsAdminFn,
+  injectMvcFn,
   type PackageType,
 } from "@/lib/admin-vouchers";
 import { useSupabaseSession } from "@/hooks/use-supabase-session";
+import { useI18n } from "@/hooks/use-i18n";
 
 const ADMIN_EMAIL = "tyozxtar@gmail.com";
 
@@ -62,6 +64,9 @@ function AdminPage() {
   const [lastCode, setLastCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [subTab, setSubTab] = useState<PackageType>("monthly");
+  const [injectEmail, setInjectEmail] = useState("");
+  const [injectAmount, setInjectAmount] = useState("");
+  const { t } = useI18n();
   const qc = useQueryClient();
   const now = useNow(60_000);
 
@@ -120,6 +125,25 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
     },
     onError: (err: Error) => toast.error(err.message),
+  });
+
+  const injectMutation = useMutation({
+    mutationFn: (input: { email: string; amount: number }) =>
+      injectMvcFn({ data: input }),
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(
+          res.reason === "USER_NOT_FOUND"
+            ? t("admin.userNotFound")
+            : t("admin.injectFailed"),
+        );
+        return;
+      }
+      toast.success(`${t("admin.injectSuccess")}: ${res.balance} MVC`);
+      setInjectEmail("");
+      setInjectAmount("");
+    },
+    onError: () => toast.error(t("admin.injectFailed")),
   });
 
   const copyCode = (code: string) => {
@@ -211,6 +235,53 @@ function AdminPage() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="home-section">
+          <h2 className="home-section-title">{t("admin.injectTitle")}</h2>
+          <div className="admin-inject-card">
+            <p className="admin-inject-desc">
+              <Coins size={14} /> {t("admin.injectDesc")}
+            </p>
+            <label className="admin-inject-field">
+              <span>{t("admin.targetEmail")}</span>
+              <input
+                type="email"
+                className="admin-inject-input"
+                value={injectEmail}
+                placeholder="user@email.com"
+                onChange={(e) => setInjectEmail(e.target.value)}
+              />
+            </label>
+            <label className="admin-inject-field">
+              <span>{t("admin.amount")}</span>
+              <input
+                type="number"
+                className="admin-inject-input"
+                value={injectAmount}
+                placeholder="10"
+                onChange={(e) => setInjectAmount(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="admin-inject-btn"
+              disabled={
+                injectMutation.isPending ||
+                !injectEmail.trim() ||
+                !Number(injectAmount)
+              }
+              onClick={() =>
+                injectMutation.mutate({
+                  email: injectEmail.trim(),
+                  amount: Number(injectAmount),
+                })
+              }
+            >
+              <Coins size={16} />
+              {injectMutation.isPending ? t("admin.injecting") : t("admin.injectBtn")}
+            </button>
           </div>
         </section>
 
