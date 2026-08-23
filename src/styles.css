@@ -2718,6 +2718,9 @@
   border: 1px solid oklch(0.78 0.16 165 / 0.35);
   border-radius: 1.4rem;
   color: oklch(0.95 0.02 170);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 .mvc-modal-head { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; text-align: center; }
 .mvc-modal-icon {
@@ -2733,7 +2736,16 @@
   display: inline-flex; align-items: center; gap: 0.35rem;
   font-size: 0.78rem; color: oklch(0.88 0.09 165);
 }
-.mvc-packs { display: flex; flex-direction: column; gap: 0.55rem; margin: 0.9rem 0; }
+.mvc-packs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.9rem 0;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  -webkit-overflow-scrolling: touch;
+}
 .mvc-pack {
   position: relative;
   display: grid;
