@@ -18,6 +18,7 @@ import {
   BadgeCheck,
   ExternalLink,
   Mail,
+  Store,
 } from "lucide-react";
 import {
   Drawer,
@@ -33,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { PremiumModal } from "@/components/premium-modal";
 import { SubscriptionModal } from "@/components/subscription-modal";
+import { MvcMarketModal } from "@/components/mvc-market-modal";
 import { useSupabaseSession } from "@/hooks/use-supabase-session";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useI18n } from "@/hooks/use-i18n";
@@ -83,6 +85,7 @@ function SettingsPage() {
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [premiumActiveOpen, setPremiumActiveOpen] = useState(false);
+  const [mvcOpen, setMvcOpen] = useState(false);
   const [name, setName] = useState<string>(() => {
     if (typeof window === "undefined") return "Matcha User";
     return localStorage.getItem("mv:profile:name") || "Matcha User";
@@ -225,6 +228,7 @@ function SettingsPage() {
     onClick: () => void;
     isExternal?: boolean;
     isAdmin?: boolean;
+    isMvc?: boolean;
   }> = [
     ...(userEmail.toLowerCase() === ADMIN_EMAIL
       ? [
@@ -248,6 +252,13 @@ function SettingsPage() {
       desc: premiumLabel,
       Icon: Crown,
       onClick: () => (isPremium ? setPremiumActiveOpen(true) : setPremiumOpen(true)),
+    },
+    {
+      label: t("mvc.title"),
+      desc: t("mvc.subtitle"),
+      Icon: Store,
+      onClick: () => setMvcOpen(true),
+      isMvc: true,
     },
     {
       label: t("settings.language"),
@@ -281,11 +292,11 @@ function SettingsPage() {
 
         <section className="home-section" aria-label="Account settings">
           <ul className="settings-list">
-            {items.map(({ label, desc, Icon, onClick, isExternal, isAdmin }) => (
+            {items.map(({ label, desc, Icon, onClick, isExternal, isAdmin, isMvc }) => (
               <li key={label}>
                 <button
                   type="button"
-                  className={`settings-item${isAdmin ? " settings-item-admin" : ""}`}
+                  className={`settings-item${isAdmin ? " settings-item-admin" : ""}${isMvc ? " settings-item-mvc" : ""}`}
                   onClick={onClick}
                 >
                   <div className="settings-item-icon">
@@ -477,6 +488,7 @@ function SettingsPage() {
       />
 
       {/* Subscription plans modal */}
+      <MvcMarketModal open={mvcOpen} onOpenChange={setMvcOpen} />
       <SubscriptionModal open={subOpen} onOpenChange={setSubOpen} />
 
       {/* KAMU SUDAH AKTIF PREMIUM popup */}
