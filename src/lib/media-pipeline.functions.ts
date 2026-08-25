@@ -18,7 +18,15 @@ export type ProcessMediaResult =
     }
   | {
       ok: false;
-      reason: "RATE_LIMIT" | "TIMEOUT" | "MISSING_KEY" | "FAILED" | "LOCKED" | "INSUFFICIENT_CREDITS";
+      reason:
+        | "RATE_LIMIT"
+        | "TIMEOUT"
+        | "MISSING_KEY"
+        | "BAD_KEY"
+        | "FAILED"
+        | "LOCKED"
+        | "INSUFFICIENT_CREDITS";
+      message?: string;
     };
 
 /**
@@ -100,9 +108,10 @@ export const processMedia = createServerFn({ method: "POST" })
       }
     } catch (err) {
       const reason = err instanceof EngineError ? err.reason : ("FAILED" as const);
-      console.error("[media-pipeline]", tier, kind, resolution, reason, err);
+      const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
+      console.error("[media-pipeline]", tier, kind, resolution, reason, message);
       // STEP 3A: nothing was ever charged, so nothing to refund.
-      return { ok: false, reason };
+      return { ok: false, reason, message };
     }
 
     // ---- STEP 3B: success -> charge now ----

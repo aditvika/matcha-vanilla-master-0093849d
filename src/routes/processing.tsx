@@ -97,18 +97,28 @@ function ProcessingPage() {
         broadcastCreditsChanged();
 
         if (!result.ok) {
-          if (result.reason === "RATE_LIMIT" || result.reason === "TIMEOUT") {
-            toast.error(
-              "Server gratisan sedang padat. Silakan coba beberapa saat lagi atau upgrade ke VIP untuk akses server kilat.",
-              { duration: 7000 },
-            );
+          const detail = result.message ? ` (${result.message})` : "";
+          if (result.reason === "RATE_LIMIT") {
+            toast.error("Engine Busy — server gratisan sedang padat, coba lagi sebentar." + detail, {
+              duration: 7000,
+            });
+          } else if (result.reason === "TIMEOUT") {
+            toast.error("Engine Timeout — proses melebihi batas waktu." + detail, {
+              duration: 7000,
+            });
+          } else if (result.reason === "BAD_KEY") {
+            toast.error("Invalid HF Key — token Hugging Face ditolak (401)." + detail, {
+              duration: 8000,
+            });
+          } else if (result.reason === "MISSING_KEY") {
+            toast.error("Engine key belum dikonfigurasi." + detail, { duration: 8000 });
           } else if (result.reason === "LOCKED" || result.reason === "INSUFFICIENT_CREDITS") {
             toast.error(
               "Kredit harian Anda habis. Upgrade ke VIP untuk akses tanpa batas & kualitas 4K!",
             );
           } else {
-            toast.error("Gagal memproses media. Kredit Anda tidak terpotong.", {
-              duration: 6000,
+            toast.error("Gagal memproses media. Kredit tidak terpotong." + detail, {
+              duration: 8000,
             });
           }
           void navigate({ to: "/preview", replace: true });
