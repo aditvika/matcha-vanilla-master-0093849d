@@ -34,8 +34,13 @@ export function falModelFor(kind: MediaKind, resolution: Resolution): string {
     : "fal-ai/seedvr/upscale/video";
 }
 
-const HF_MODEL = "ai-forever/Real-ESRGAN";
-const HF_ENDPOINT = `https://router.huggingface.co/hf-inference/models/${HF_MODEL}`;
+/** Candidate HF image-upscaling endpoints, tried in order. */
+const HF_ENDPOINTS = [
+  "https://router.huggingface.co/hf-inference/models/ai-forever/Real-ESRGAN",
+  "https://router.huggingface.co/hf-inference/models/xinntao/ESRGAN",
+  "https://api-inference.huggingface.co/models/ai-forever/Real-ESRGAN",
+  "https://api-inference.huggingface.co/models/xinntao/ESRGAN",
+];
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GATEWAY_MODEL = "google/gemini-2.5-flash-image";
 
