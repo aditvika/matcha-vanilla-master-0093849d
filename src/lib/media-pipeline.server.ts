@@ -15,7 +15,7 @@ export type Resolution = "720p" | "1080p" | "2K" | "4K";
 export class EngineError extends Error {
   constructor(
     message: string,
-    readonly reason: "RATE_LIMIT" | "TIMEOUT" | "MISSING_KEY" | "FAILED",
+    readonly reason: "RATE_LIMIT" | "TIMEOUT" | "MISSING_KEY" | "BAD_KEY" | "FAILED",
   ) {
     super(message);
     this.name = "EngineError";
