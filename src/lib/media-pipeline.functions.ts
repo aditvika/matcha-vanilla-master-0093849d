@@ -18,7 +18,15 @@ export type ProcessMediaResult =
     }
   | {
       ok: false;
-      reason: "RATE_LIMIT" | "TIMEOUT" | "MISSING_KEY" | "FAILED" | "LOCKED" | "INSUFFICIENT_CREDITS";
+      reason:
+        | "RATE_LIMIT"
+        | "TIMEOUT"
+        | "MISSING_KEY"
+        | "BAD_KEY"
+        | "FAILED"
+        | "LOCKED"
+        | "INSUFFICIENT_CREDITS";
+      message?: string;
     };
 
 /**
