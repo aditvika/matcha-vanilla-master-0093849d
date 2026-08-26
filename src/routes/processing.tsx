@@ -108,9 +108,11 @@ function ProcessingPage() {
             media.kind,
             resolution as "720p" | "1080p" | "2K" | "4K",
           );
+          const userId = path.split("/")[0];
+          if (!userId) throw new Error("Invalid media upload path");
           const outputPath = await uploadProcessedMedia(
             local.blob,
-            media.file.name ? path.split("/")[0] ?? "" : "",
+            userId,
             local.extension,
             local.contentType,
           );
@@ -164,11 +166,15 @@ function ProcessingPage() {
             replace: true,
           });
         }, 350);
-      } catch {
+      } catch (error) {
         // Nothing is charged before a successful result, so the balance is intact.
         await refreshCreditsGlobal();
         broadcastCreditsChanged();
-        toast.error("Gagal memproses media. Kredit Anda tidak terpotong.");
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("[media-pipeline] client fallback failed:", detail);
+        toast.error(`Pemrosesan gagal: ${detail}. Kredit Anda tidak terpotong.`, {
+          duration: 8000,
+        });
         void navigate({ to: "/preview", replace: true });
       }
 
