@@ -8,8 +8,7 @@ import { toast } from "sonner";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
-import { processMedia } from "@/lib/media-pipeline.functions";
-import { completeLocalMedia } from "@/lib/media-pipeline.functions";
+import { completeLocalMedia, processMedia } from "@/lib/media-pipeline.functions";
 import { processMediaLocally } from "@/lib/client-media-upscaler";
 import { uploadProcessedMedia } from "@/lib/media-upload";
 
@@ -98,9 +97,16 @@ function ProcessingPage() {
 
         if (!result.ok && result.reason === "LOCAL_FALLBACK") {
           console.warn(`[media-pipeline] ${result.message} Falling back to local canvas.`);
+          const fallbackCause = /401|403|invalid|unauthorized/i.test(result.message)
+            ? "Invalid HF Key"
+            : /timed out|timeout/i.test(result.message)
+              ? "Engine Timeout"
+              : /429|rate limit|loading|503/i.test(result.message)
+                ? "Engine Busy"
+                : "HF Engine Error";
           toast.info(
             media.kind === "photo"
-              ? "Server AI tidak tersedia. Melanjutkan dengan pemrosesan lokal."
+              ? `${fallbackCause} — melanjutkan dengan pemrosesan lokal.`
               : "Video gratis diproses langsung di perangkat Anda.",
           );
           const local = await processMediaLocally(
