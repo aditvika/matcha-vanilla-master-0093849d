@@ -9,6 +9,9 @@ import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
 import { processMedia } from "@/lib/media-pipeline.functions";
+import { completeLocalMedia } from "@/lib/media-pipeline.functions";
+import { processMediaLocally } from "@/lib/client-media-upscaler";
+import { uploadProcessedMedia } from "@/lib/media-upload";
 
 const searchSchema = z.object({
   resolution: z.string(),
@@ -49,6 +52,7 @@ function ProcessingPage() {
   const { resolution, path } = Route.useSearch();
   const navigate = useNavigate();
   const runPipeline = useServerFn(processMedia);
+  const completeLocalPipeline = useServerFn(completeLocalMedia);
   const [progress, setProgress] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
   const startedRef = useRef(false);
@@ -84,13 +88,40 @@ function ProcessingPage() {
 
     void (async () => {
       try {
-        const result = await runPipeline({
+        let result = await runPipeline({
           data: {
             path,
             kind: media.kind,
             resolution: resolution as "720p" | "1080p" | "2K" | "4K",
           },
         });
+
+        if (!result.ok && result.reason === "LOCAL_FALLBACK") {
+          console.warn(`[media-pipeline] ${result.message} Falling back to local canvas.`);
+          toast.info(
+            media.kind === "photo"
+              ? "Server AI tidak tersedia. Melanjutkan dengan pemrosesan lokal."
+              : "Video gratis diproses langsung di perangkat Anda.",
+          );
+          const local = await processMediaLocally(
+            media.file,
+            media.kind,
+            resolution as "720p" | "1080p" | "2K" | "4K",
+          );
+          const outputPath = await uploadProcessedMedia(
+            local.blob,
+            media.file.name ? path.split("/")[0] ?? "" : "",
+            local.extension,
+            local.contentType,
+          );
+          result = await completeLocalPipeline({
+            data: {
+              outputPath,
+              kind: media.kind,
+              resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+            },
+          });
+        }
 
         // Always resync from the server clock/balance, refund or not.
         await refreshCreditsGlobal();
@@ -142,7 +173,7 @@ function ProcessingPage() {
       }
 
     })();
-  }, [media, navigate, path, resolution, runPipeline]);
+  }, [completeLocalPipeline, media, navigate, path, resolution, runPipeline]);
 
 
   if (!media) return null;

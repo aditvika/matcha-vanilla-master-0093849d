@@ -2,12 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const inputSchema = z.object({
-  path: z.string().min(1),
-  kind: z.enum(["photo", "video"]),
-  resolution: z.enum(["720p", "1080p", "2K", "4K"]),
-});
-
 export type ProcessMediaResult =
   | {
       ok: true;
@@ -41,7 +35,13 @@ export type ProcessMediaResult =
  */
 export const processMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => inputSchema.parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({
+      path: z.string().min(1),
+      kind: z.enum(["photo", "video"]),
+      resolution: z.enum(["720p", "1080p", "2K", "4K"]),
+    }).parse(input),
+  )
   .handler(async ({ data, context }): Promise<ProcessMediaResult> => {
     const { supabase, userId } = context;
     const { path, kind, resolution } = data;
@@ -164,6 +164,14 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
       return { ok: false, reason: "FAILED", message: "Processed output was not found" };
     }
 
+    const { data: signed, error: signError } = await supabase.storage
+      .from("mv-media")
+      .createSignedUrl(data.outputPath, 60 * 60);
+    if (signError || !signed?.signedUrl) {
+      console.error("[media-pipeline] local output signing failed:", signError?.message);
+      return { ok: false, reason: "FAILED", message: "Could not open processed output" };
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: charge } = await (supabase.rpc as any)("consume_credits", {
       p_kind: data.kind,
@@ -171,14 +179,6 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
     });
     const result = (charge ?? {}) as { success?: boolean; cost?: number };
     if (!result.success) return { ok: false, reason: "INSUFFICIENT_CREDITS" };
-
-    const { data: signed, error: signError } = await supabase.storage
-      .from("mv-media")
-      .createSignedUrl(data.outputPath, 60 * 60);
-    if (signError || !signed?.signedUrl) {
-      console.error("[media-pipeline] local output signing failed after charge:", signError?.message);
-      return { ok: false, reason: "FAILED", message: "Could not open processed output" };
-    }
 
     return {
       ok: true,
