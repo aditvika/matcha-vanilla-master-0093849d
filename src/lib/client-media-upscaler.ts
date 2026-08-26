@@ -36,7 +36,7 @@ async function upscalePhoto(file: File, resolution: keyof typeof HEIGHTS): Promi
     if (!ctx) throw new Error("Canvas processing is unavailable");
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.filter = "contrast(1.04) saturate(1.03) sharpen(1)";
+    ctx.filter = "contrast(1.04) saturate(1.03)";
     ctx.drawImage(bitmap, 0, 0, size.width, size.height);
     return {
       blob: await canvasBlob(canvas, "image/png"),
