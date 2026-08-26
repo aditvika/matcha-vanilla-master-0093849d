@@ -41,8 +41,6 @@ const HF_ENDPOINTS = [
   "https://api-inference.huggingface.co/models/ai-forever/Real-ESRGAN",
   "https://api-inference.huggingface.co/models/xinntao/ESRGAN",
 ];
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const GATEWAY_MODEL = "google/gemini-2.5-flash-image";
 
 async function withTimeout(input: string, init: RequestInit, ms: number) {
   const ctrl = new AbortController();
@@ -57,16 +55,6 @@ async function withTimeout(input: string, init: RequestInit, ms: number) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-function base64FromBytes(bytes: ArrayBuffer): string {
-  const arr = new Uint8Array(bytes);
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < arr.length; i += chunk) {
-    bin += String.fromCharCode(...arr.subarray(i, i + chunk));
-  }
-  return btoa(bin);
 }
 
 function bytesFromBase64(b64: string): ArrayBuffer {
@@ -153,56 +141,9 @@ async function tryHuggingFace(bytes: ArrayBuffer, contentType: string): Promise<
   throw lastError;
 }
 
-/** Fallback free engine: Lovable AI Gateway image model (no user key required). */
-async function tryGateway(bytes: ArrayBuffer, contentType: string): Promise<ArrayBuffer> {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new EngineError("LOVABLE_API_KEY missing", "MISSING_KEY");
-
-  const dataUri = `data:${contentType || "image/jpeg"};base64,${base64FromBytes(bytes)}`;
-  const res = await withTimeout(
-    GATEWAY_URL,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: GATEWAY_MODEL,
-        modalities: ["image", "text"],
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Upscale and restore this photo: sharpen details, remove noise and compression artifacts, keep the exact same composition, faces and colors. Return only the enhanced image.",
-              },
-              { type: "image_url", image_url: { url: dataUri } },
-            ],
-          },
-        ],
-      }),
-    },
-    120_000,
-  );
-
-  if (res.status === 429) throw new EngineError("Free engine is busy", "RATE_LIMIT");
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    console.error(`[gateway] ${res.status} ${detail.slice(0, 500)}`);
-    throw new EngineError(`Gateway ${res.status}: ${detail.slice(0, 300)}`, "FAILED");
-  }
-
-  const json = (await res.json()) as {
-    choices?: { message?: { images?: { image_url?: { url?: string } }[] } }[];
-  };
-  const url = json.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-  if (!url) throw new EngineError("Gateway returned no image", "FAILED");
-  return bytesFromBase64(url.replace(/^data:[^,]+,/, ""));
-}
-
 /**
- * FREE photo engine. Tries Hugging Face first (Real-ESRGAN); if the token is
- * missing/invalid or the model is unavailable, falls back to the built-in AI
- * image model so free users still get a result.
+ * FREE photo engine. Hugging Face failures retain their exact cause so the
+ * caller can switch to the browser's canvas upscaler without charging first.
  */
 export async function runFreePhotoEngine(sourceUrl: string): Promise<ArrayBuffer> {
   const src = await withTimeout(sourceUrl, { method: "GET" }, 60_000);
@@ -210,12 +151,7 @@ export async function runFreePhotoEngine(sourceUrl: string): Promise<ArrayBuffer
   const contentType = src.headers.get("content-type") ?? "image/jpeg";
   const bytes = await src.arrayBuffer();
 
-  try {
-    return await tryHuggingFace(bytes, contentType);
-  } catch (err) {
-    console.error("[free-photo] Hugging Face failed, falling back:", err);
-    return await tryGateway(bytes, contentType);
-  }
+  return await tryHuggingFace(bytes, contentType);
 }
 
 
