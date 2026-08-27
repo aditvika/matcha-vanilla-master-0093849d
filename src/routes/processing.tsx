@@ -218,11 +218,15 @@ function ProcessingPage() {
       <div className="proc-bg" aria-hidden />
       <div className="proc-card">
         <div className="proc-badge">
-          {isPremium ? <Zap size={14} /> : <Loader2 size={14} className="proc-spin" />}
-          <span>{isPremium ? "PRIORITY LANE" : "STANDARD LANE"}</span>
+          {isPremium && !localMode ? (
+            <Zap size={14} />
+          ) : (
+            <Loader2 size={14} className="proc-spin" />
+          )}
+          <span>{localMode ? "LOCAL ENGINE" : isPremium ? "PRIORITY LANE" : "STANDARD LANE"}</span>
         </div>
 
-        {isPremium ? (
+        {isPremium && !localMode ? (
           <div className="proc-orbit" aria-hidden>
             <div className="proc-orbit-ring proc-orbit-a" />
             <div className="proc-orbit-ring proc-orbit-b" />
@@ -240,12 +244,13 @@ function ProcessingPage() {
           </div>
         )}
 
-        <p className="proc-message" key={msgIdx}>
-          {messages[msgIdx]}
+        <p className="proc-message" key={localMode ? "local" : msgIdx}>
+          {statusText ?? messages[msgIdx]}
         </p>
         <p className="proc-sub">
           Output resolution: <strong>{resolution}</strong>
         </p>
+
       </div>
     </main>
   );
