@@ -103,7 +103,7 @@ function ProcessingPage() {
               kind: media.kind,
               resolution: resolution as "720p" | "1080p" | "2K" | "4K",
             },
-          });
+          })) as LooseResult;
 
         if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
           const message = result?.message ?? "";
