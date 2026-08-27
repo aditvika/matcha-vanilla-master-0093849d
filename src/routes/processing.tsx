@@ -91,8 +91,13 @@ function ProcessingPage() {
 
     void (async () => {
       try {
-        let result: Partial<Awaited<ReturnType<typeof runPipeline>>> | undefined =
-          await runPipeline({
+        type LooseResult = {
+          ok?: boolean;
+          reason?: string;
+          message?: string;
+          outputUrl?: string;
+        };
+        let result: LooseResult | undefined = (await runPipeline({
             data: {
               path,
               kind: media.kind,
