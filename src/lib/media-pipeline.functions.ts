@@ -6,7 +6,7 @@ export type ProcessMediaResult =
   | {
       ok: true;
       outputUrl: string;
-      engine: "huggingface" | "fal" | "client";
+      engine: "fal" | "client";
       tier: string;
       charged: number;
     }
