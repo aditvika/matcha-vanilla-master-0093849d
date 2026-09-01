@@ -30,62 +30,73 @@ export const removeWatermark = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }): Promise<RemoveWatermarkResult> => {
-    const { supabase, userId } = context;
-    const { path, kind, mode, text, maskPath } = data;
-    void userId;
-
-    const cost = kind === "photo" ? 1 : 2;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rpc = supabase.rpc as any;
-
-    // ---- Step 1: affordability check only (plan pool + MVC wallet) ----
-    const { data: status } = await rpc("get_credit_status");
-    const s = (status ?? {}) as {
-      tier?: string;
-      mvc_balance?: number;
-      pools?: { key: string; remaining: number }[];
-    };
-    const tier = String(s.tier ?? "free");
-    const poolKey = tier === "free" ? kind : "credits";
-    const pool = (s.pools ?? []).find((p) => p.key === poolKey);
-    const wallet = Number(s.mvc_balance ?? 0);
-    if (pool && pool.remaining + wallet < cost) {
-      return { ok: false, reason: "INSUFFICIENT_CREDITS" };
-    }
-
-
-    const { data: signed } = await supabase.storage
-      .from("mv-media")
-      .createSignedUrl(path, 60 * 30);
-    if (!signed?.signedUrl) return { ok: false, reason: "FAILED" };
-
-    let maskUrl: string | undefined;
-    if (maskPath) {
-      const { data: m } = await supabase.storage.from("mv-media").createSignedUrl(maskPath, 60 * 30);
-      maskUrl = m?.signedUrl ?? undefined;
-    }
-
-    const { WatermarkError, removeImageWatermark, removeVideoWatermark } = await import(
-      "./watermark.server"
-    );
-
-    // ---- Step 2: run the engine ----
-    let outputUrl: string;
     try {
-      outputUrl =
-        kind === "photo"
-          ? await removeImageWatermark(signed.signedUrl, mode, { text, maskUrl })
-          : await removeVideoWatermark(signed.signedUrl, mode, { text, maskUrl });
-    } catch (err) {
-      const reason = err instanceof WatermarkError ? err.reason : ("FAILED" as const);
-      console.error("[remove-watermark]", kind, mode, reason, err);
-      return { ok: false, reason };
+      const { supabase, userId } = context;
+      const { path, kind, mode, text, maskPath } = data;
+      void userId;
+
+      const cost = kind === "photo" ? 1 : 2;
+
+      // Bound wrapper: never detach `rpc` from the Supabase client.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rpc = (fn: string, args?: unknown) => (supabase.rpc as any)(fn, args);
+
+      // ---- Step 1: affordability check only (plan pool + MVC wallet) ----
+      const { data: status } = await rpc("get_credit_status");
+      const s = (status ?? {}) as {
+        tier?: string;
+        mvc_balance?: number;
+        pools?: { key: string; remaining: number }[];
+      };
+      const tier = String(s.tier ?? "free");
+      const poolKey = tier === "free" ? kind : "credits";
+      const pool = (s.pools ?? []).find((p) => p.key === poolKey);
+      const wallet = Number(s.mvc_balance ?? 0);
+      if (pool && pool.remaining + wallet < cost) {
+        return { ok: false, reason: "INSUFFICIENT_CREDITS" };
+      }
+
+      const { data: signed } = await supabase.storage
+        .from("mv-media")
+        .createSignedUrl(path, 60 * 30);
+      if (!signed?.signedUrl) return { ok: false, reason: "FAILED" };
+
+      let maskUrl: string | undefined;
+      if (maskPath) {
+        const { data: m } = await supabase.storage
+          .from("mv-media")
+          .createSignedUrl(maskPath, 60 * 30);
+        maskUrl = m?.signedUrl ?? undefined;
+      }
+
+      const { WatermarkError, removeImageWatermark, removeVideoWatermark } = await import(
+        "./watermark.server"
+      );
+
+      // ---- Step 2: run the engine ----
+      let outputUrl: string;
+      try {
+        outputUrl =
+          kind === "photo"
+            ? await removeImageWatermark(signed.signedUrl, mode, { text, maskUrl })
+            : await removeVideoWatermark(signed.signedUrl, mode, { text, maskUrl });
+      } catch (err) {
+        const reason = err instanceof WatermarkError ? err.reason : ("FAILED" as const);
+        console.error("[remove-watermark]", kind, mode, reason, err);
+        return { ok: false, reason };
+      }
+
+      // ---- Step 3: charge only after success ----
+      const { data: charge } = await rpc("consume_mvc", { p_kind: kind, p_amount: cost });
+      const c = (charge ?? {}) as { success?: boolean; cost?: number };
+
+      return { ok: true, outputUrl, charged: c.success ? Number(c.cost ?? cost) : 0 };
+    } catch (error) {
+      console.error(
+        "[remove-watermark] unhandled",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      return { ok: false, reason: "FAILED" };
     }
-
-    // ---- Step 3: charge only after success ----
-    const { data: charge } = await rpc("consume_mvc", { p_kind: kind, p_amount: cost });
-    const c = (charge ?? {}) as { success?: boolean; cost?: number };
-
-    return { ok: true, outputUrl, charged: c.success ? Number(c.cost ?? cost) : 0 };
   });
+
