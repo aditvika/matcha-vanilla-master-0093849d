@@ -97,30 +97,24 @@ function ProcessingPage() {
           message?: string;
           outputUrl?: string;
         };
-        let result: LooseResult | undefined = (await runPipeline({
-            data: {
-              path,
-              kind: media.kind,
-              resolution: resolution as "720p" | "1080p" | "2K" | "4K",
-            },
-          })) as LooseResult;
+        let result: LooseResult = ((await runPipeline({
+          data: {
+            path,
+            kind: media.kind,
+            resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+          },
+        })) ?? { ok: false, reason: "FAILED" }) as LooseResult;
 
         if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
           const message = result?.message ?? "";
-          console.warn(`[media-pipeline] ${message} Falling back to local canvas.`);
-          const fallbackCause = /401|403|invalid|unauthorized/i.test(message)
-            ? "Invalid HF Key"
-            : /timed out|timeout/i.test(message)
-              ? "Engine Timeout"
-              : /429|rate limit|loading|503/i.test(message)
-                ? "Engine Busy"
-                : "HF Engine Error";
+          console.info(`[media-pipeline] local engine: ${message}`);
           toast.info(
             media.kind === "photo"
-              ? `${fallbackCause} — beralih ke Local Canvas Upscaler di perangkat Anda.`
-              : "Video gratis di-upscale frame-by-frame langsung di perangkat Anda.",
+              ? "Mode gratis — foto ditingkatkan langsung di perangkat Anda."
+              : "Mode gratis — video di-upscale frame-by-frame di perangkat Anda.",
             { duration: 6000 },
           );
+
           localRef.current = true;
           setLocalMode(true);
           setProgress(0);
@@ -167,9 +161,10 @@ function ProcessingPage() {
               duration: 7000,
             });
           } else if (reason === "BAD_KEY") {
-            toast.error("Invalid HF Key — token Hugging Face ditolak (401)." + detail, {
+            toast.error("Kunci engine premium ditolak." + detail, {
               duration: 8000,
             });
+
           } else if (reason === "MISSING_KEY") {
             toast.error("Engine key belum dikonfigurasi." + detail, { duration: 8000 });
           } else if (reason === "LOCKED" || reason === "INSUFFICIENT_CREDITS") {
