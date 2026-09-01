@@ -132,42 +132,50 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }): Promise<ProcessMediaResult> => {
-    const { supabase, userId } = context;
-    if (!data.outputPath.startsWith(`${userId}/out-local-`)) {
-      return { ok: false, reason: "FAILED", message: "Invalid local output path" };
+    try {
+      const { supabase, userId } = context;
+      if (!data.outputPath.startsWith(`${userId}/out-local-`)) {
+        return { ok: false, reason: "FAILED", message: "Invalid local output path" };
+      }
+
+      const fileName = data.outputPath.split("/").pop();
+      if (!fileName) return { ok: false, reason: "FAILED", message: "Invalid local output" };
+      const { data: files, error: listError } = await supabase.storage
+        .from("mv-media")
+        .list(userId, { search: fileName, limit: 1 });
+      if (listError || !files?.some((file) => file.name === fileName)) {
+        return { ok: false, reason: "FAILED", message: "Processed output was not found" };
+      }
+
+      const { data: signed, error: signError } = await supabase.storage
+        .from("mv-media")
+        .createSignedUrl(data.outputPath, 60 * 60);
+      if (signError || !signed?.signedUrl) {
+        console.error("[media-pipeline] local output signing failed:", signError?.message);
+        return { ok: false, reason: "FAILED", message: "Could not open processed output" };
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rpc = (fn: string, args?: unknown) => (supabase.rpc as any)(fn, args);
+      const { data: charge } = await rpc("consume_credits", {
+        p_kind: data.kind,
+        p_resolution: data.resolution,
+      });
+      const result = (charge ?? {}) as { success?: boolean; cost?: number };
+      if (!result.success) return { ok: false, reason: "INSUFFICIENT_CREDITS" };
+
+      return {
+        ok: true,
+        outputUrl: signed.signedUrl,
+        engine: "client",
+        tier: "free",
+        charged: Number(result.cost ?? 0),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("[media-pipeline] completeLocalMedia unhandled", message);
+      return { ok: false, reason: "FAILED", message };
     }
-
-    const fileName = data.outputPath.split("/").pop();
-    if (!fileName) return { ok: false, reason: "FAILED", message: "Invalid local output" };
-    const { data: files, error: listError } = await supabase.storage
-      .from("mv-media")
-      .list(userId, { search: fileName, limit: 1 });
-    if (listError || !files?.some((file) => file.name === fileName)) {
-      return { ok: false, reason: "FAILED", message: "Processed output was not found" };
-    }
-
-    const { data: signed, error: signError } = await supabase.storage
-      .from("mv-media")
-      .createSignedUrl(data.outputPath, 60 * 60);
-    if (signError || !signed?.signedUrl) {
-      console.error("[media-pipeline] local output signing failed:", signError?.message);
-      return { ok: false, reason: "FAILED", message: "Could not open processed output" };
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: charge } = await (supabase.rpc as any)("consume_credits", {
-      p_kind: data.kind,
-      p_resolution: data.resolution,
-    });
-    const result = (charge ?? {}) as { success?: boolean; cost?: number };
-    if (!result.success) return { ok: false, reason: "INSUFFICIENT_CREDITS" };
-
-    return {
-      ok: true,
-      outputUrl: signed.signedUrl,
-      engine: "client",
-      tier: "free",
-      charged: Number(result.cost ?? 0),
-    };
   });
+
 
