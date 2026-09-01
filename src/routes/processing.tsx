@@ -161,9 +161,10 @@ function ProcessingPage() {
               duration: 7000,
             });
           } else if (reason === "BAD_KEY") {
-            toast.error("Invalid HF Key — token Hugging Face ditolak (401)." + detail, {
+            toast.error("Kunci engine premium ditolak." + detail, {
               duration: 8000,
             });
+
           } else if (reason === "MISSING_KEY") {
             toast.error("Engine key belum dikonfigurasi." + detail, { duration: 8000 });
           } else if (reason === "LOCKED" || reason === "INSUFFICIENT_CREDITS") {
