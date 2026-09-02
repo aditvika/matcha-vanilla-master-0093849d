@@ -11,6 +11,7 @@ import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hoo
 import { completeLocalMedia, processMedia } from "@/lib/media-pipeline.functions";
 import { processMediaLocally } from "@/lib/client-media-upscaler";
 import { uploadProcessedMedia } from "@/lib/media-upload";
+import { ensureFreshSession, isAuthError } from "@/lib/session-guard";
 
 const searchSchema = z.object({
   resolution: z.string(),
@@ -91,6 +92,10 @@ function ProcessingPage() {
 
     void (async () => {
       try {
+        // Validate/refresh the session BEFORE any heavy work so an expired
+        // token fails gracefully instead of 401-ing mid-render.
+        await ensureFreshSession();
+
         type LooseResult = {
           ok?: boolean;
           reason?: string;
@@ -138,6 +143,8 @@ function ProcessingPage() {
           );
           setStatusText("Mengunggah hasil...");
           setProgress(98);
+          // Rendering can take minutes; refresh the token before upload + charge.
+          await ensureFreshSession();
           const userId = path.split("/")[0];
           if (!userId) throw new Error("Invalid media upload path");
           const outputPath = await uploadProcessedMedia(
@@ -206,6 +213,13 @@ function ProcessingPage() {
         broadcastCreditsChanged();
         const detail = error instanceof Error ? error.message : String(error);
         console.error("[media-pipeline] client fallback failed:", detail);
+        if (isAuthError(error)) {
+          toast.error("Sesi Anda berakhir. Silakan masuk kembali — kredit tidak terpotong.", {
+            duration: 8000,
+          });
+          void navigate({ to: "/auth", replace: true });
+          return;
+        }
         toast.error(`Pemrosesan gagal: ${detail}. Kredit Anda tidak terpotong.`, {
           duration: 8000,
         });
