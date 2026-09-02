@@ -118,13 +118,23 @@ function ProcessingPage() {
           localRef.current = true;
           setLocalMode(true);
           setProgress(0);
-          setStatusText("Local Canvas Upscaler — memproses di perangkat...");
+          setStatusText(
+            media.kind === "photo"
+              ? "Local Canvas Upscaler — mode kualitas maksimum..."
+              : "Local Canvas Upscaler — render frame-by-frame 60 FPS (butuh waktu lama)...",
+          );
 
           const local = await processMediaLocally(
             media.file,
             media.kind,
             resolution as "720p" | "1080p" | "2K" | "4K",
-            (fraction) => setProgress(Math.min(97, Math.round(fraction * 95))),
+            (fraction) => {
+              const pct = Math.min(97, Math.round(fraction * 95));
+              setProgress(pct);
+              if (media.kind === "video") {
+                setStatusText(`Merender frame ${Math.round(fraction * 100)}% — jangan tutup halaman`);
+              }
+            },
           );
           setStatusText("Mengunggah hasil...");
           setProgress(98);
