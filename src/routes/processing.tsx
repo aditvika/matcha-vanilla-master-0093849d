@@ -11,6 +11,7 @@ import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hoo
 import { completeLocalMedia, processMedia } from "@/lib/media-pipeline.functions";
 import { processMediaLocally } from "@/lib/client-media-upscaler";
 import { uploadProcessedMedia } from "@/lib/media-upload";
+import { ensureFreshSession, isAuthError } from "@/lib/session-guard";
 
 const searchSchema = z.object({
   resolution: z.string(),
