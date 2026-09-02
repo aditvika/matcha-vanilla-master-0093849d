@@ -198,6 +198,9 @@ async function upscaleVideo(
     if (duration <= 0) throw new Error("The selected video has no readable duration");
     const totalFrames = Math.max(1, Math.round(duration * TARGET_FPS));
 
+    // Decode the original audio up-front (independent of the slow frame pass).
+    const audioBuffer = await decodeSourceAudio(file);
+
     recorder.start();
 
     for (let frame = 0; frame < totalFrames; frame++) {
@@ -213,7 +216,8 @@ async function upscaleVideo(
       videoTrack.requestFrame?.();
       // Yield to the encoder so nothing is queued or coalesced away.
       await nextTask();
-      onProgress?.(Math.min(0.99, (frame + 1) / totalFrames));
+      const fraction = (frame + 1) / totalFrames;
+      onProgress?.(Math.min(0.85, fraction * (audioBuffer ? 0.85 : 0.99)));
     }
 
     // Let the encoder flush the last pushed frame before stopping.
@@ -221,14 +225,144 @@ async function upscaleVideo(
     recorder.stop();
     stream.getTracks().forEach((track) => track.stop());
 
-    const blob = await finished;
+    const silentBlob = await finished;
+    if (!audioBuffer) {
+      onProgress?.(1);
+      return { blob: silentBlob, extension: "webm", contentType: "video/webm" };
+    }
+
+    const merged = await muxAudio(silentBlob, audioBuffer, duration, mimeType, (fraction) =>
+      onProgress?.(0.85 + fraction * 0.14),
+    );
     onProgress?.(1);
-    return { blob, extension: "webm", contentType: "video/webm" };
+    return { blob: merged, extension: "webm", contentType: "video/webm" };
   } finally {
     video.pause();
     URL.revokeObjectURL(sourceUrl);
   }
 }
+
+type AudioCtor = typeof AudioContext;
+
+function getAudioContextCtor(): AudioCtor | null {
+  const w = window as unknown as { AudioContext?: AudioCtor; webkitAudioContext?: AudioCtor };
+  return w.AudioContext ?? w.webkitAudioContext ?? null;
+}
+
+/** Decode the source file's audio track; returns null when the file has none. */
+async function decodeSourceAudio(file: File): Promise<AudioBuffer | null> {
+  const Ctor = getAudioContextCtor();
+  if (!Ctor) return null;
+  const ctx = new Ctor();
+  try {
+    const bytes = await file.arrayBuffer();
+    const buffer = await ctx.decodeAudioData(bytes);
+    return buffer.length > 0 ? buffer : null;
+  } catch {
+    return null;
+  } finally {
+    void ctx.close();
+  }
+}
+
+/**
+ * Second pass: play the rendered (silent) video in real time while feeding the
+ * decoded original audio through a MediaStream destination, so both tracks are
+ * recorded on the same clock and stay in sync for the full source duration.
+ */
+async function muxAudio(
+  silentVideo: Blob,
+  audioBuffer: AudioBuffer,
+  duration: number,
+  mimeType: string,
+  onProgress?: LocalProgress,
+): Promise<Blob> {
+  const Ctor = getAudioContextCtor();
+  if (!Ctor) return silentVideo;
+
+  const url = URL.createObjectURL(silentVideo);
+  const player = document.createElement("video");
+  player.src = url;
+  player.muted = true;
+  player.playsInline = true;
+  player.preload = "auto";
+  const audioCtx = new Ctor();
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      player.oncanplaythrough = () => resolve();
+      player.onerror = () => reject(new Error("Rendered video could not be re-read for audio merge"));
+    });
+
+    const videoStream = (
+      player as HTMLVideoElement & { captureStream?: () => MediaStream }
+    ).captureStream?.();
+    const videoTrack = videoStream?.getVideoTracks()[0];
+    if (!videoTrack) return silentVideo;
+
+    const destination = audioCtx.createMediaStreamDestination();
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(destination);
+    const audioTrack = destination.stream.getAudioTracks()[0];
+    if (!audioTrack) return silentVideo;
+
+    const combined = new MediaStream([videoTrack, audioTrack]);
+    const recorder = new MediaRecorder(combined, {
+      mimeType,
+      videoBitsPerSecond: 16_000_000,
+      audioBitsPerSecond: 192_000,
+    });
+    const chunks: BlobPart[] = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    const finished = new Promise<Blob>((resolve, reject) => {
+      recorder.onerror = () => reject(new Error("Audio merge encoder failed"));
+      recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
+    });
+
+    await audioCtx.resume();
+    recorder.start();
+    // Start both clocks together so audio never drifts from the picture.
+    source.start();
+    await player.play();
+
+    await new Promise<void>((resolve) => {
+      const tick = setInterval(() => {
+        onProgress?.(Math.min(0.99, duration > 0 ? player.currentTime / duration : 0));
+      }, 200);
+      const done = () => {
+        clearInterval(tick);
+        resolve();
+      };
+      player.onended = done;
+      // Safety net in case 'ended' never fires on a stream-backed element.
+      setTimeout(done, Math.ceil((duration + 2) * 1000));
+    });
+
+    // Flush the tail before finalising.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (recorder.state !== "inactive") recorder.stop();
+    try {
+      source.stop();
+    } catch {
+      /* already stopped */
+    }
+    combined.getTracks().forEach((track) => track.stop());
+
+    const blob = await finished;
+    onProgress?.(1);
+    return blob.size > 0 ? blob : silentVideo;
+  } catch {
+    return silentVideo;
+  } finally {
+    player.pause();
+    URL.revokeObjectURL(url);
+    void audioCtx.close();
+  }
+}
+
 
 
 
