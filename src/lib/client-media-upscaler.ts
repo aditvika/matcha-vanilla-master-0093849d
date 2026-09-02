@@ -96,7 +96,8 @@ async function upscalePhoto(
     onProgress?.(0.7);
     const finalCanvas = sharpen(scaled);
     onProgress?.(0.9);
-    const blob = await canvasBlob(finalCanvas, "image/png");
+    // Lossless PNG export; quality argument kept at 1.0 for encoders that honour it.
+    const blob = await canvasBlob(finalCanvas, "image/png", 1.0);
     onProgress?.(1);
     return { blob, extension: "png", contentType: "image/png" };
   } finally {
@@ -106,9 +107,37 @@ async function upscalePhoto(
 
 type VideoFrameCallbackVideo = HTMLVideoElement & {
   requestVideoFrameCallback?: (cb: () => void) => number;
-  captureStream?: () => MediaStream;
-  mozCaptureStream?: () => MediaStream;
 };
+
+type FrameRequestTrack = MediaStreamTrack & { requestFrame?: () => void };
+
+const TARGET_FPS = 60;
+
+/** Seek the video to an exact timestamp and wait until that frame is decoded. */
+function seekTo(video: VideoFrameCallbackVideo, time: number) {
+  return new Promise<void>((resolve, reject) => {
+    const done = () => {
+      video.removeEventListener("seeked", onSeeked);
+      resolve();
+    };
+    const onSeeked = () => {
+      if (typeof video.requestVideoFrameCallback === "function") {
+        video.requestVideoFrameCallback(() => done());
+      } else {
+        requestAnimationFrame(() => done());
+      }
+    };
+    video.addEventListener("seeked", onSeeked, { once: true });
+    video.onerror = () => reject(new Error("The selected video could not be decoded"));
+    try {
+      video.currentTime = Math.min(time, Math.max(0, video.duration - 0.0001));
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error("Video seek failed"));
+    }
+  });
+}
+
+const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 async function upscaleVideo(
   file: File,
@@ -124,6 +153,7 @@ async function upscaleVideo(
   video.src = sourceUrl;
   video.playsInline = true;
   video.preload = "auto";
+  video.muted = true;
   video.volume = 0;
 
   try {
@@ -131,6 +161,8 @@ async function upscaleVideo(
       video.onloadedmetadata = () => resolve();
       video.onerror = () => reject(new Error("The selected video could not be decoded"));
     });
+    // Make sure the first frame is actually decoded before capture starts.
+    await seekTo(video, 0);
 
     const size = outputSize(video.videoWidth, video.videoHeight, resolution);
     const canvas = document.createElement("canvas");
@@ -141,108 +173,53 @@ async function upscaleVideo(
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    // Intermediate buffer at 2x source used for step-scaling each frame.
-    const midW = Math.min(size.width, video.videoWidth * 2);
-    const midH = Math.min(size.height, video.videoHeight * 2);
-    const mid = document.createElement("canvas");
-    mid.width = Math.max(1, Math.round(midW));
-    mid.height = Math.max(1, Math.round(midH));
-    const midCtx = mid.getContext("2d", { alpha: false });
-    if (!midCtx) throw new Error("Canvas processing is unavailable");
-    midCtx.imageSmoothingEnabled = true;
-    midCtx.imageSmoothingQuality = "high";
+    // Manual-frame capture: the recorder only advances when we push a frame,
+    // so a slow device stretches the work instead of dropping frames.
+    const canvasStream = canvas.captureStream(0);
+    const videoTrack = canvasStream.getVideoTracks()[0] as FrameRequestTrack;
+    const stream = new MediaStream([videoTrack]);
 
-    // Auto-capture stream: frame timestamps follow the real playback clock, so the
-    // output duration always matches the source even when drawing is slow.
-    const canvasStream = canvas.captureStream();
-    const stream = new MediaStream(canvasStream.getVideoTracks());
-
-    // Merge the original audio track back in so the output keeps its sound.
-    let sourceStream: MediaStream | null = null;
-    try {
-      sourceStream = video.captureStream?.() ?? video.mozCaptureStream?.() ?? null;
-      sourceStream?.getAudioTracks().forEach((track) => stream.addTrack(track));
-    } catch {
-      sourceStream = null;
-    }
-
-    const hasAudio = stream.getAudioTracks().length > 0;
-    const candidates = hasAudio
-      ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
-      : ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    const candidates = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     const mimeType = candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "video/webm";
     const recorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: 8_000_000,
-      audioBitsPerSecond: 128_000,
+      videoBitsPerSecond: 16_000_000,
     });
     const chunks: BlobPart[] = [];
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
     };
-
     const finished = new Promise<Blob>((resolve, reject) => {
       recorder.onerror = () => reject(new Error("Local video encoder failed"));
       recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
     });
 
-    let drawing = true;
-    let busy = false;
-    // Draw synchronously per presented source frame; skip re-entrancy instead of
-    // queueing work so playback (and therefore duration) never drifts.
-    const renderFrame = () => {
-      if (busy) return;
-      busy = true;
-      midCtx.drawImage(video, 0, 0, mid.width, mid.height);
-      ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 1;
-      ctx.drawImage(mid, 0, 0, size.width, size.height);
-      ctx.globalCompositeOperation = "overlay";
-      ctx.globalAlpha = 0.16;
-      ctx.drawImage(mid, 0, 0, size.width, size.height);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
-      if (onProgress && video.duration > 0) {
-        onProgress(Math.min(0.99, video.currentTime / video.duration));
-      }
-      busy = false;
-    };
-
-    const useFrameCallback = typeof video.requestVideoFrameCallback === "function";
-    const pump = () => {
-      if (!drawing) return;
-      renderFrame();
-      if (useFrameCallback) video.requestVideoFrameCallback!(pump);
-      else requestAnimationFrame(pump);
-    };
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    if (duration <= 0) throw new Error("The selected video has no readable duration");
+    const totalFrames = Math.max(1, Math.round(duration * TARGET_FPS));
 
     recorder.start();
-    renderFrame();
-    pump();
-    try {
-      await video.play();
-    } catch {
-      // Autoplay with audio can be blocked; retry silently (video-only output).
-      video.muted = true;
-      await video.play();
+
+    for (let frame = 0; frame < totalFrames; frame++) {
+      const time = (frame / TARGET_FPS) * 1;
+      // Duplicate source frames evenly: seeking to each 1/60s slot yields the
+      // nearest decoded frame, so slower sources become native 60 FPS output.
+      await seekTo(video, Math.min(time, duration));
+
+      const scaled = stepScale(video, video.videoWidth, video.videoHeight, size.width, size.height);
+      const sharpened = sharpen(scaled);
+      ctx.drawImage(sharpened, 0, 0, size.width, size.height);
+
+      videoTrack.requestFrame?.();
+      // Yield to the encoder so nothing is queued or coalesced away.
+      await nextTask();
+      onProgress?.(Math.min(0.99, (frame + 1) / totalFrames));
     }
-    await new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(
-        () => reject(new Error("Local video processing timed out")),
-        Math.max(60_000, video.duration * 3_000 + 60_000),
-      );
-      video.onended = () => {
-        window.clearTimeout(timeout);
-        resolve();
-      };
-    });
-    // Draw the final frame and give the encoder a beat to flush it.
-    renderFrame();
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    drawing = false;
+
+    // Let the encoder flush the last pushed frame before stopping.
+    await new Promise((resolve) => setTimeout(resolve, 300));
     recorder.stop();
     stream.getTracks().forEach((track) => track.stop());
-    sourceStream?.getTracks().forEach((track) => track.stop());
 
     const blob = await finished;
     onProgress?.(1);
@@ -252,6 +229,7 @@ async function upscaleVideo(
     URL.revokeObjectURL(sourceUrl);
   }
 }
+
 
 
 export function processMediaLocally(
