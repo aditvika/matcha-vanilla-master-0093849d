@@ -92,6 +92,10 @@ function ProcessingPage() {
 
     void (async () => {
       try {
+        // Validate/refresh the session BEFORE any heavy work so an expired
+        // token fails gracefully instead of 401-ing mid-render.
+        await ensureFreshSession();
+
         type LooseResult = {
           ok?: boolean;
           reason?: string;
