@@ -213,6 +213,13 @@ function ProcessingPage() {
         broadcastCreditsChanged();
         const detail = error instanceof Error ? error.message : String(error);
         console.error("[media-pipeline] client fallback failed:", detail);
+        if (isAuthError(error)) {
+          toast.error("Sesi Anda berakhir. Silakan masuk kembali — kredit tidak terpotong.", {
+            duration: 8000,
+          });
+          void navigate({ to: "/auth", replace: true });
+          return;
+        }
         toast.error(`Pemrosesan gagal: ${detail}. Kredit Anda tidak terpotong.`, {
           duration: 8000,
         });
