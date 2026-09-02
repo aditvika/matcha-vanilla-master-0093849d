@@ -143,6 +143,8 @@ function ProcessingPage() {
           );
           setStatusText("Mengunggah hasil...");
           setProgress(98);
+          // Rendering can take minutes; refresh the token before upload + charge.
+          await ensureFreshSession();
           const userId = path.split("/")[0];
           if (!userId) throw new Error("Invalid media upload path");
           const outputPath = await uploadProcessedMedia(
