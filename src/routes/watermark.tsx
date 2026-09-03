@@ -509,7 +509,11 @@ function WatermarkPage() {
       </header>
 
       <section className="wm-stage-wrap" aria-label={t("wm.title")}>
-        <div className="wm-stage" ref={stageRef}>
+        <div
+          className="wm-stage"
+          ref={stageRef}
+          style={{ touchAction: kind === "video" ? "manipulation" : "none" }}
+        >
           <div className="wm-surface" ref={surfaceRef} style={surfaceStyle}>
             {kind === "video" ? (
               <video src={previewUrl} className="wm-media" controls playsInline />

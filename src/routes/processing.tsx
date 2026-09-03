@@ -126,7 +126,7 @@ function ProcessingPage() {
           setStatusText(
             media.kind === "photo"
               ? "Local Canvas Upscaler — mode kualitas maksimum..."
-              : "Local Canvas Upscaler — render frame-by-frame 60 FPS (butuh waktu lama)...",
+              : "Local Canvas Upscaler — render frame-by-frame 50 FPS (mode kualitas tinggi, butuh waktu lama)...",
           );
 
           const local = await processMediaLocally(

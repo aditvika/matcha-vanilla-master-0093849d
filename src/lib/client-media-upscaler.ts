@@ -108,20 +108,25 @@ function convolveSharpen(canvas: HTMLCanvasElement, amount: number): HTMLCanvasE
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
-        d[i] = s[i]!;
-        d[i + 1] = s[i + 1]!;
-        d[i + 2] = s[i + 2]!;
-        d[i + 3] = s[i + 3]!;
+        d[i] = s[i] ?? 0;
+        d[i + 1] = s[i + 1] ?? 0;
+        d[i + 2] = s[i + 2] ?? 0;
+        d[i + 3] = s[i + 3] ?? 255;
         continue;
       }
       const up = i - w * 4;
       const dn = i + w * 4;
       for (let k = 0; k < 3; k++) {
         const v =
-          c * s[i + k]! + n * (s[up + k]! + s[dn + k]! + s[i - 4 + k]! + s[i + 4 + k]!);
+          c * (s[i + k] ?? 0) +
+          n *
+            ((s[up + k] ?? 0) +
+              (s[dn + k] ?? 0) +
+              (s[i - 4 + k] ?? 0) +
+              (s[i + 4 + k] ?? 0));
         d[i + k] = v < 0 ? 0 : v > 255 ? 255 : v;
       }
-      d[i + 3] = s[i + 3]!;
+      d[i + 3] = s[i + 3] ?? 255;
     }
   }
   ctx.putImageData(out, 0, 0);
