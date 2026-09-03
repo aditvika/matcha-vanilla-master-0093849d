@@ -165,7 +165,7 @@ type VideoFrameCallbackVideo = HTMLVideoElement & {
 
 type FrameRequestTrack = MediaStreamTrack & { requestFrame?: () => void };
 
-const TARGET_FPS = 60;
+const TARGET_FPS = 50;
 
 /** Seek the video to an exact timestamp and wait until that frame is decoded. */
 function seekTo(video: VideoFrameCallbackVideo, time: number) {
