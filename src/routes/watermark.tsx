@@ -509,7 +509,11 @@ function WatermarkPage() {
       </header>
 
       <section className="wm-stage-wrap" aria-label={t("wm.title")}>
-        <div className="wm-stage" ref={stageRef}>
+        <div
+          className="wm-stage"
+          ref={stageRef}
+          style={{ touchAction: kind === "video" ? "manipulation" : "none" }}
+        >
           <div className="wm-surface" ref={surfaceRef} style={surfaceStyle}>
             {kind === "video" ? (
               <video src={previewUrl} className="wm-media" controls playsInline />
@@ -520,7 +524,15 @@ function WatermarkPage() {
               <canvas
                 ref={canvasRef}
                 className="wm-canvas"
-                style={{ cursor: canDraw ? "crosshair" : "grab" }}
+                style={{
+                  cursor: canDraw ? "crosshair" : "grab",
+                  // Video keeps its native controls usable: the overlay only
+                  // takes pointer events while an area tool is active, and it
+                  // never covers the bottom control bar.
+                  pointerEvents: kind === "video" && !canDraw ? "none" : "auto",
+                  bottom: kind === "video" ? 64 : 0,
+                  touchAction: kind === "video" && !canDraw ? "auto" : "none",
+                }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}

@@ -37,6 +37,7 @@ function stepScale(
   srcH: number,
   dstW: number,
   dstH: number,
+  stepFactor = 2,
 ): HTMLCanvasElement {
   let curW = srcW;
   let curH = srcH;
@@ -45,11 +46,13 @@ function stepScale(
   current.height = curH;
   const c0 = current.getContext("2d");
   if (!c0) throw new Error("Canvas processing is unavailable");
+  c0.imageSmoothingEnabled = true;
+  c0.imageSmoothingQuality = "high";
   c0.drawImage(source, 0, 0, curW, curH);
 
   while (curW < dstW || curH < dstH) {
-    const nextW = Math.min(dstW, Math.round(curW * 2));
-    const nextH = Math.min(dstH, Math.round(curH * 2));
+    const nextW = Math.min(dstW, Math.round(curW * stepFactor));
+    const nextH = Math.min(dstH, Math.round(curH * stepFactor));
     const next = document.createElement("canvas");
     next.width = nextW;
     next.height = nextH;
@@ -83,6 +86,53 @@ function sharpen(canvas: HTMLCanvasElement): HTMLCanvasElement {
   return out;
 }
 
+/**
+ * Real pixel-level unsharp mask: convolve with a 3x3 edge kernel and blend the
+ * result back over the original so edges crisp up without ringing artefacts.
+ * Runs on getImageData/putImageData, so it is heavy but genuinely visible.
+ */
+function convolveSharpen(canvas: HTMLCanvasElement, amount: number): HTMLCanvasElement {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas processing is unavailable");
+  const { width: w, height: h } = canvas;
+  const src = ctx.getImageData(0, 0, w, h);
+  const s = src.data;
+  const out = ctx.createImageData(w, h);
+  const d = out.data;
+
+  // Laplacian sharpening kernel, strength scaled by `amount`.
+  const c = 1 + 4 * amount;
+  const n = -amount;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+        d[i] = s[i] ?? 0;
+        d[i + 1] = s[i + 1] ?? 0;
+        d[i + 2] = s[i + 2] ?? 0;
+        d[i + 3] = s[i + 3] ?? 255;
+        continue;
+      }
+      const up = i - w * 4;
+      const dn = i + w * 4;
+      for (let k = 0; k < 3; k++) {
+        const v =
+          c * (s[i + k] ?? 0) +
+          n *
+            ((s[up + k] ?? 0) +
+              (s[dn + k] ?? 0) +
+              (s[i - 4 + k] ?? 0) +
+              (s[i + 4 + k] ?? 0));
+        d[i + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+      }
+      d[i + 3] = s[i + 3] ?? 255;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  return canvas;
+}
+
 async function upscalePhoto(
   file: File,
   resolution: keyof typeof HEIGHTS,
@@ -90,12 +140,21 @@ async function upscalePhoto(
 ): Promise<LocalMediaResult> {
   const bitmap = await createImageBitmap(file);
   try {
-    onProgress?.(0.15);
+    onProgress?.(0.1);
     const size = outputSize(bitmap.width, bitmap.height, resolution);
-    const scaled = stepScale(bitmap, bitmap.width, bitmap.height, size.width, size.height);
-    onProgress?.(0.7);
+    // Gentle 1.5x steps: more passes, far better detail retention than one jump.
+    const scaled = stepScale(bitmap, bitmap.width, bitmap.height, size.width, size.height, 1.5);
+    onProgress?.(0.45);
+    await nextFrame();
+    // Two graded convolution passes: strong edges first, then a finishing pass.
+    convolveSharpen(scaled, 0.55);
+    onProgress?.(0.65);
+    await nextFrame();
+    convolveSharpen(scaled, 0.3);
+    onProgress?.(0.82);
+    await nextFrame();
     const finalCanvas = sharpen(scaled);
-    onProgress?.(0.9);
+    onProgress?.(0.92);
     // Lossless PNG export; quality argument kept at 1.0 for encoders that honour it.
     const blob = await canvasBlob(finalCanvas, "image/png", 1.0);
     onProgress?.(1);
@@ -111,7 +170,7 @@ type VideoFrameCallbackVideo = HTMLVideoElement & {
 
 type FrameRequestTrack = MediaStreamTrack & { requestFrame?: () => void };
 
-const TARGET_FPS = 60;
+const TARGET_FPS = 50;
 
 /** Seek the video to an exact timestamp and wait until that frame is decoded. */
 function seekTo(video: VideoFrameCallbackVideo, time: number) {
@@ -138,6 +197,8 @@ function seekTo(video: VideoFrameCallbackVideo, time: number) {
 }
 
 const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const nextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 async function upscaleVideo(
   file: File,
@@ -203,21 +264,24 @@ async function upscaleVideo(
 
     recorder.start();
 
+    onProgress?.(0.01);
     for (let frame = 0; frame < totalFrames; frame++) {
-      const time = (frame / TARGET_FPS) * 1;
-      // Duplicate source frames evenly: seeking to each 1/60s slot yields the
-      // nearest decoded frame, so slower sources become native 60 FPS output.
+      const time = frame / TARGET_FPS;
+      // Duplicate source frames evenly: every 1/50s slot is rendered and
+      // explicitly pushed, so slower sources become native 50 FPS output.
       await seekTo(video, Math.min(time, duration));
 
       const scaled = stepScale(video, video.videoWidth, video.videoHeight, size.width, size.height);
       const sharpened = sharpen(scaled);
       ctx.drawImage(sharpened, 0, 0, size.width, size.height);
 
+      // Push only after the complete frame is drawn, then yield a paint so the
+      // progress UI stays responsive while the next frame is prepared.
       videoTrack.requestFrame?.();
-      // Yield to the encoder so nothing is queued or coalesced away.
-      await nextTask();
       const fraction = (frame + 1) / totalFrames;
       onProgress?.(Math.min(0.85, fraction * (audioBuffer ? 0.85 : 0.99)));
+      await nextFrame();
+      await nextTask();
     }
 
     // Let the encoder flush the last pushed frame before stopping.
