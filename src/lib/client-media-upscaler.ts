@@ -46,6 +46,8 @@ function stepScale(
   current.height = curH;
   const c0 = current.getContext("2d");
   if (!c0) throw new Error("Canvas processing is unavailable");
+  c0.imageSmoothingEnabled = true;
+  c0.imageSmoothingQuality = "high";
   c0.drawImage(source, 0, 0, curW, curH);
 
   while (curW < dstW || curH < dstH) {
