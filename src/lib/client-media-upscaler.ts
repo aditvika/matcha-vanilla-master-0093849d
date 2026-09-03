@@ -264,6 +264,7 @@ async function upscaleVideo(
 
     recorder.start();
 
+    onProgress?.(0.01);
     for (let frame = 0; frame < totalFrames; frame++) {
       const time = frame / TARGET_FPS;
       // Duplicate source frames evenly: every 1/50s slot is rendered and
@@ -274,11 +275,13 @@ async function upscaleVideo(
       const sharpened = sharpen(scaled);
       ctx.drawImage(sharpened, 0, 0, size.width, size.height);
 
+      // Push only after the complete frame is drawn, then yield a paint so the
+      // progress UI stays responsive while the next frame is prepared.
       videoTrack.requestFrame?.();
-      // Yield to the encoder so nothing is queued or coalesced away.
-      await nextTask();
       const fraction = (frame + 1) / totalFrames;
       onProgress?.(Math.min(0.85, fraction * (audioBuffer ? 0.85 : 0.99)));
+      await nextFrame();
+      await nextTask();
     }
 
     // Let the encoder flush the last pushed frame before stopping.
