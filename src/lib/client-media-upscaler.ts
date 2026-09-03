@@ -84,6 +84,48 @@ function sharpen(canvas: HTMLCanvasElement): HTMLCanvasElement {
   return out;
 }
 
+/**
+ * Real pixel-level unsharp mask: convolve with a 3x3 edge kernel and blend the
+ * result back over the original so edges crisp up without ringing artefacts.
+ * Runs on getImageData/putImageData, so it is heavy but genuinely visible.
+ */
+function convolveSharpen(canvas: HTMLCanvasElement, amount: number): HTMLCanvasElement {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas processing is unavailable");
+  const { width: w, height: h } = canvas;
+  const src = ctx.getImageData(0, 0, w, h);
+  const s = src.data;
+  const out = ctx.createImageData(w, h);
+  const d = out.data;
+
+  // Laplacian sharpening kernel, strength scaled by `amount`.
+  const c = 1 + 4 * amount;
+  const n = -amount;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+        d[i] = s[i]!;
+        d[i + 1] = s[i + 1]!;
+        d[i + 2] = s[i + 2]!;
+        d[i + 3] = s[i + 3]!;
+        continue;
+      }
+      const up = i - w * 4;
+      const dn = i + w * 4;
+      for (let k = 0; k < 3; k++) {
+        const v =
+          c * s[i + k]! + n * (s[up + k]! + s[dn + k]! + s[i - 4 + k]! + s[i + 4 + k]!);
+        d[i + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+      }
+      d[i + 3] = s[i + 3]!;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  return canvas;
+}
+
 async function upscalePhoto(
   file: File,
   resolution: keyof typeof HEIGHTS,
@@ -91,12 +133,21 @@ async function upscalePhoto(
 ): Promise<LocalMediaResult> {
   const bitmap = await createImageBitmap(file);
   try {
-    onProgress?.(0.15);
+    onProgress?.(0.1);
     const size = outputSize(bitmap.width, bitmap.height, resolution);
-    const scaled = stepScale(bitmap, bitmap.width, bitmap.height, size.width, size.height);
-    onProgress?.(0.7);
+    // Gentle 1.5x steps: more passes, far better detail retention than one jump.
+    const scaled = stepScale(bitmap, bitmap.width, bitmap.height, size.width, size.height, 1.5);
+    onProgress?.(0.45);
+    await nextFrame();
+    // Two graded convolution passes: strong edges first, then a finishing pass.
+    convolveSharpen(scaled, 0.55);
+    onProgress?.(0.65);
+    await nextFrame();
+    convolveSharpen(scaled, 0.3);
+    onProgress?.(0.82);
+    await nextFrame();
     const finalCanvas = sharpen(scaled);
-    onProgress?.(0.9);
+    onProgress?.(0.92);
     // Lossless PNG export; quality argument kept at 1.0 for encoders that honour it.
     const blob = await canvasBlob(finalCanvas, "image/png", 1.0);
     onProgress?.(1);
