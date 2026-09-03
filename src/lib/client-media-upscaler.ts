@@ -260,9 +260,9 @@ async function upscaleVideo(
     recorder.start();
 
     for (let frame = 0; frame < totalFrames; frame++) {
-      const time = (frame / TARGET_FPS) * 1;
-      // Duplicate source frames evenly: seeking to each 1/60s slot yields the
-      // nearest decoded frame, so slower sources become native 60 FPS output.
+      const time = frame / TARGET_FPS;
+      // Duplicate source frames evenly: every 1/50s slot is rendered and
+      // explicitly pushed, so slower sources become native 50 FPS output.
       await seekTo(video, Math.min(time, duration));
 
       const scaled = stepScale(video, video.videoWidth, video.videoHeight, size.width, size.height);
