@@ -190,6 +190,8 @@ function seekTo(video: VideoFrameCallbackVideo, time: number) {
 }
 
 const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const nextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 async function upscaleVideo(
   file: File,
