@@ -37,6 +37,7 @@ function stepScale(
   srcH: number,
   dstW: number,
   dstH: number,
+  stepFactor = 2,
 ): HTMLCanvasElement {
   let curW = srcW;
   let curH = srcH;
@@ -48,8 +49,8 @@ function stepScale(
   c0.drawImage(source, 0, 0, curW, curH);
 
   while (curW < dstW || curH < dstH) {
-    const nextW = Math.min(dstW, Math.round(curW * 2));
-    const nextH = Math.min(dstH, Math.round(curH * 2));
+    const nextW = Math.min(dstW, Math.round(curW * stepFactor));
+    const nextH = Math.min(dstH, Math.round(curH * stepFactor));
     const next = document.createElement("canvas");
     next.width = nextW;
     next.height = nextH;
