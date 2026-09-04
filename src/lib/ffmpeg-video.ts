@@ -98,9 +98,12 @@ export async function upscaleVideoLocally(
       "yuv420p",
       "-movflags",
       "+faststart",
-      // Keep the original audio track exactly as authored (CapCut edits etc.).
+      // Re-encode audio to AAC so any source codec lands cleanly in MP4.
       "-c:a",
-      "copy",
+      "aac",
+      "-b:a",
+      "192k",
+
       outputName,
     ]);
 
