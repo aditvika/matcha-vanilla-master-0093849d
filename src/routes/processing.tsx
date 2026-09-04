@@ -13,7 +13,9 @@ import {
   processMedia,
   refundLocalRun,
 } from "@/lib/media-pipeline.functions";
-import { processMediaLocally } from "@/lib/local-engine";
+import { processMedia as processMediaService } from "@/lib/media-service";
+import { transformPhoto } from "@/lib/photo-transform.functions";
+
 
 import { uploadProcessedMedia } from "@/lib/media-upload";
 import { ensureFreshSession, isAuthError } from "@/lib/session-guard";
