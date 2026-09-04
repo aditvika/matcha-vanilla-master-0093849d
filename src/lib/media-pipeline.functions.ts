@@ -72,14 +72,28 @@ export const processMedia = createServerFn({ method: "POST" })
         return { ok: false, reason: "INSUFFICIENT_CREDITS" };
       }
 
-      // ---- FREE TIER: no external API. Local browser engine handles it. ----
+      // ---- FREE TIER: no external API. Local ONNX/FFmpeg engine handles it. ----
+      // Security gate: credits are deducted here, BEFORE the local WebAssembly
+      // script is allowed to run. A failed local run refunds via refundLocalRun.
       if (!isPaid) {
+        const { data: gate } = await rpc("consume_credits", {
+          p_kind: kind,
+          p_resolution: resolution,
+        });
+        const g = (gate ?? {}) as { success?: boolean; reason?: string };
+        if (!g.success) {
+          return {
+            ok: false,
+            reason: g.reason === "LOCKED" ? "LOCKED" : "INSUFFICIENT_CREDITS",
+          };
+        }
         return {
           ok: false,
           reason: "LOCAL_FALLBACK",
-          message: "Free tier uses the on-device canvas engine.",
+          message: "Free tier uses the on-device AI engine.",
         };
       }
+
 
       const { data: signed, error: signErr } = await supabase.storage
         .from("mv-media")
@@ -155,22 +169,15 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
         return { ok: false, reason: "FAILED", message: "Could not open processed output" };
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rpc = (fn: string, args?: unknown) => (supabase.rpc as any)(fn, args);
-      const { data: charge } = await rpc("consume_credits", {
-        p_kind: data.kind,
-        p_resolution: data.resolution,
-      });
-      const result = (charge ?? {}) as { success?: boolean; cost?: number };
-      if (!result.success) return { ok: false, reason: "INSUFFICIENT_CREDITS" };
-
+      // Credits were already deducted by the pre-execution gate in processMedia.
       return {
         ok: true,
         outputUrl: signed.signedUrl,
         engine: "client",
         tier: "free",
-        charged: Number(result.cost ?? 0),
+        charged: 0,
       };
+
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error("[media-pipeline] completeLocalMedia unhandled", message);
@@ -179,3 +186,34 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
   });
 
 
+
+/**
+ * Returns the pre-deducted credits when the local ONNX/FFmpeg run fails, so a
+ * crashed device never costs the user anything.
+ */
+export const refundLocalRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      kind: z.enum(["photo", "video"]),
+      resolution: z.enum(["720p", "1080p", "2K", "4K"]),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
+    try {
+      const { supabase } = context;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rpc = (fn: string, args?: unknown) => (supabase.rpc as any)(fn, args);
+      const { data: result } = await rpc("refund_credits", {
+        p_kind: data.kind,
+        p_resolution: data.resolution,
+      });
+      return { ok: Boolean((result ?? {}) && (result as { success?: boolean }).success) };
+    } catch (error) {
+      console.error(
+        "[media-pipeline] refundLocalRun failed",
+        error instanceof Error ? error.message : error,
+      );
+      return { ok: false };
+    }
+  });

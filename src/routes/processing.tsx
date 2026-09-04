@@ -8,8 +8,13 @@ import { toast } from "sonner";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
-import { completeLocalMedia, processMedia } from "@/lib/media-pipeline.functions";
-import { processMediaLocally } from "@/lib/client-media-upscaler";
+import {
+  completeLocalMedia,
+  processMedia,
+  refundLocalRun,
+} from "@/lib/media-pipeline.functions";
+import { processMediaLocally } from "@/lib/local-engine";
+
 import { uploadProcessedMedia } from "@/lib/media-upload";
 import { ensureFreshSession, isAuthError } from "@/lib/session-guard";
 
@@ -53,6 +58,8 @@ function ProcessingPage() {
   const navigate = useNavigate();
   const runPipeline = useServerFn(processMedia);
   const completeLocalPipeline = useServerFn(completeLocalMedia);
+  const refundLocal = useServerFn(refundLocalRun);
+
   const [progress, setProgress] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
   const [localMode, setLocalMode] = useState(false);
@@ -111,12 +118,15 @@ function ProcessingPage() {
         })) ?? { ok: false, reason: "FAILED" }) as LooseResult;
 
         if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
+
           const message = result?.message ?? "";
           console.info(`[media-pipeline] local engine: ${message}`);
+          // Credits were validated + deducted server-side before we got here.
+          chargedRef.current = true;
           toast.info(
             media.kind === "photo"
-              ? "Mode gratis — foto ditingkatkan langsung di perangkat Anda."
-              : "Mode gratis — video di-upscale frame-by-frame di perangkat Anda.",
+              ? "Mode gratis — AI upscaler (Real-ESRGAN) berjalan langsung di perangkat Anda."
+              : "Mode gratis — FFmpeg WebAssembly memproses video di perangkat Anda.",
             { duration: 6000 },
           );
 
@@ -125,25 +135,27 @@ function ProcessingPage() {
           setProgress(0);
           setStatusText(
             media.kind === "photo"
-              ? "Local Canvas Upscaler — mode kualitas maksimum..."
-              : "Local Canvas Upscaler — render frame-by-frame 50 FPS (mode kualitas tinggi, butuh waktu lama)...",
+              ? "Local AI Engine — memuat model Real-ESRGAN (ONNX)..."
+              : "Local Video Engine — memuat FFmpeg WebAssembly...",
           );
 
           const local = await processMediaLocally(
             media.file,
             media.kind,
             resolution as "720p" | "1080p" | "2K" | "4K",
-            (fraction) => {
+            (fraction: number) => {
               const pct = Math.min(97, Math.round(fraction * 95));
               setProgress(pct);
-              if (media.kind === "video") {
-                setStatusText(`Merender frame ${Math.round(fraction * 100)}% — jangan tutup halaman`);
-              }
+              setStatusText(
+                media.kind === "photo"
+                  ? `AI merekonstruksi detail ${Math.round(fraction * 100)}% — jangan tutup halaman`
+                  : `FFmpeg WASM mengencode ${Math.round(fraction * 100)}% — jangan tutup halaman`,
+              );
             },
           );
           setStatusText("Mengunggah hasil...");
           setProgress(98);
-          // Rendering can take minutes; refresh the token before upload + charge.
+          // Rendering can take minutes; refresh the token before upload.
           await ensureFreshSession();
           const userId = path.split("/")[0];
           if (!userId) throw new Error("Invalid media upload path");
@@ -161,6 +173,7 @@ function ProcessingPage() {
             },
           });
         }
+
 
         // Always resync from the server clock/balance (charge happens on success only).
         await refreshCreditsGlobal();
