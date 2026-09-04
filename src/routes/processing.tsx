@@ -66,6 +66,7 @@ function ProcessingPage() {
   const [statusText, setStatusText] = useState<string | null>(null);
   const startedRef = useRef(false);
   const localRef = useRef(false);
+  const chargedRef = useRef(false);
 
   const duration = isPremium ? 4000 : 30000;
   const messages = isPremium ? PREMIUM_MESSAGES : FREE_MESSAGES;
