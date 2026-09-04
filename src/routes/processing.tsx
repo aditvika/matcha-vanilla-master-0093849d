@@ -8,8 +8,13 @@ import { toast } from "sonner";
 import { useSelectedMedia } from "@/hooks/use-selected-media";
 import { usePremiumStatus } from "@/hooks/use-premium-status";
 import { useCredits, refreshCreditsGlobal, broadcastCreditsChanged } from "@/hooks/use-credits";
-import { completeLocalMedia, processMedia } from "@/lib/media-pipeline.functions";
-import { processMediaLocally } from "@/lib/client-media-upscaler";
+import {
+  completeLocalMedia,
+  processMedia,
+  refundLocalRun,
+} from "@/lib/media-pipeline.functions";
+import { processMediaLocally } from "@/lib/local-engine";
+
 import { uploadProcessedMedia } from "@/lib/media-upload";
 import { ensureFreshSession, isAuthError } from "@/lib/session-guard";
 
