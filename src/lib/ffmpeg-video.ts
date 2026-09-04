@@ -52,26 +52,9 @@ function isMobile() {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
-/** Reads duration without decoding the whole file. */
-function probeDuration(file: File): Promise<number> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement("video");
-    video.preload = "metadata";
-    const done = (value: number) => {
-      URL.revokeObjectURL(url);
-      resolve(value);
-    };
-    video.onloadedmetadata = () => done(Number.isFinite(video.duration) ? video.duration : 0);
-    video.onerror = () => done(0);
-    video.src = url;
-  });
-}
-
-// Mobile browsers run out of wasm memory on long clips, which yields truncated
-// or 0-byte files. Keep local mobile encoding inside a safe envelope.
-const MOBILE_MAX_SECONDS = 90;
-const MOBILE_MAX_HEIGHT = 1080;
+// Full-length inputs are always honoured — we never truncate a user's clip.
+// Mobile safety comes from capping the output height instead.
+const MOBILE_MAX_HEIGHT = 720;
 
 export async function upscaleVideoLocally(
   file: File,
@@ -79,16 +62,11 @@ export async function upscaleVideoLocally(
   onProgress?: (fraction: number) => void,
 ): Promise<{ blob: Blob; extension: "mp4"; contentType: "video/mp4" }> {
   const mobile = isMobile();
-  const duration = await probeDuration(file);
-  if (mobile && duration > MOBILE_MAX_SECONDS) {
-    throw new Error(
-      `Video terlalu panjang untuk diproses di perangkat mobile (maks ${MOBILE_MAX_SECONDS} detik). Gunakan klip lebih pendek atau proses lewat perangkat desktop.`,
-    );
-  }
 
   const ffmpeg = await getFFmpeg();
   const requested = TARGET_HEIGHT[resolution];
   const height = mobile ? Math.min(requested, MOBILE_MAX_HEIGHT) : requested;
+
 
   const handleProgress = ({ progress }: { progress: number }) => {
     if (Number.isFinite(progress)) onProgress?.(Math.max(0, Math.min(1, progress)));
