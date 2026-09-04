@@ -181,6 +181,16 @@ function ProcessingPage() {
         broadcastCreditsChanged();
 
         if (result?.ok !== true) {
+          if (chargedRef.current) {
+            chargedRef.current = false;
+            try {
+              await refundLocal({ data: {} });
+              await refreshCreditsGlobal();
+              broadcastCreditsChanged();
+            } catch (refundError) {
+              console.error("[media-pipeline] refund failed:", refundError);
+            }
+          }
           const reason = result?.reason ?? "FAILED";
           const detail = result?.message ? ` (${result.message})` : "";
           if (reason === "RATE_LIMIT") {
