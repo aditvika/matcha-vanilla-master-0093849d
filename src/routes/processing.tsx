@@ -184,7 +184,7 @@ function ProcessingPage() {
           if (chargedRef.current) {
             chargedRef.current = false;
             try {
-              await refundLocal({ data: {} });
+              await refundLocal({ data: { kind: media.kind, resolution: resolution as "720p" | "1080p" | "2K" | "4K" } });
               await refreshCreditsGlobal();
               broadcastCreditsChanged();
             } catch (refundError) {
@@ -235,7 +235,7 @@ function ProcessingPage() {
         if (chargedRef.current) {
           chargedRef.current = false;
           try {
-            await refundLocal({ data: {} });
+            await refundLocal({ data: { kind: media.kind, resolution: resolution as "720p" | "1080p" | "2K" | "4K" } });
           } catch (refundError) {
             console.error("[media-pipeline] refund failed:", refundError);
           }
