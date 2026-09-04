@@ -47,13 +47,48 @@ const TARGET_HEIGHT = {
 
 export type VideoResolution = keyof typeof TARGET_HEIGHT;
 
+function isMobile() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+/** Reads duration without decoding the whole file. */
+function probeDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const done = (value: number) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    video.onloadedmetadata = () => done(Number.isFinite(video.duration) ? video.duration : 0);
+    video.onerror = () => done(0);
+    video.src = url;
+  });
+}
+
+// Mobile browsers run out of wasm memory on long clips, which yields truncated
+// or 0-byte files. Keep local mobile encoding inside a safe envelope.
+const MOBILE_MAX_SECONDS = 90;
+const MOBILE_MAX_HEIGHT = 1080;
+
 export async function upscaleVideoLocally(
   file: File,
   resolution: VideoResolution,
   onProgress?: (fraction: number) => void,
 ): Promise<{ blob: Blob; extension: "mp4"; contentType: "video/mp4" }> {
+  const mobile = isMobile();
+  const duration = await probeDuration(file);
+  if (mobile && duration > MOBILE_MAX_SECONDS) {
+    throw new Error(
+      `Video terlalu panjang untuk diproses di perangkat mobile (maks ${MOBILE_MAX_SECONDS} detik). Gunakan klip lebih pendek atau proses lewat perangkat desktop.`,
+    );
+  }
+
   const ffmpeg = await getFFmpeg();
-  const height = TARGET_HEIGHT[resolution];
+  const requested = TARGET_HEIGHT[resolution];
+  const height = mobile ? Math.min(requested, MOBILE_MAX_HEIGHT) : requested;
 
   const handleProgress = ({ progress }: { progress: number }) => {
     if (Number.isFinite(progress)) onProgress?.(Math.max(0, Math.min(1, progress)));
@@ -66,19 +101,21 @@ export async function upscaleVideoLocally(
   try {
     await ffmpeg.writeFile(inputName, await fetchFile(file));
 
+    const filter = mobile
+      ? `scale=-2:${height}:flags=bicubic`
+      : `scale=-2:${height}:flags=lanczos,unsharp=5:5:0.8:3:3:0.4`;
+
     const code = await ffmpeg.exec([
       "-i",
       inputName,
       "-vf",
-      // Lanczos resampling + a light unsharp pass reconstructs far more detail
-      // than canvas bilinear scaling, with even width/height for H.264.
-      `scale=-2:${height}:flags=lanczos,unsharp=5:5:0.8:3:3:0.4`,
+      filter,
       "-c:v",
       "libx264",
       "-preset",
-      "veryfast",
+      mobile ? "ultrafast" : "veryfast",
       "-crf",
-      "20",
+      mobile ? "24" : "20",
       "-pix_fmt",
       "yuv420p",
       "-movflags",
@@ -93,6 +130,9 @@ export async function upscaleVideoLocally(
 
     const data = await ffmpeg.readFile(outputName);
     const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data));
+    if (!bytes || bytes.byteLength < 1024) {
+      throw new Error("Hasil video tidak valid (file kosong). Coba klip yang lebih pendek.");
+    }
     onProgress?.(1);
     return {
       blob: new Blob([bytes as unknown as BlobPart], { type: "video/mp4" }),
@@ -105,3 +145,4 @@ export async function upscaleVideoLocally(
     await ffmpeg.deleteFile(outputName).catch(() => undefined);
   }
 }
+
