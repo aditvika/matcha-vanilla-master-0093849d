@@ -257,7 +257,7 @@ function ProcessingPage() {
         void navigate({ to: "/preview", replace: true });
       }
     })();
-  }, [completeLocalPipeline, media, navigate, path, resolution, runPipeline]);
+  }, [completeLocalPipeline, media, navigate, path, refundLocal, resolution, runPipeline]);
 
 
 
