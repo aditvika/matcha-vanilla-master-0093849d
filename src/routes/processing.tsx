@@ -118,7 +118,7 @@ function ProcessingPage() {
         })) ?? { ok: false, reason: "FAILED" }) as LooseResult;
 
         if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
-        if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
+
           const message = result?.message ?? "";
           console.info(`[media-pipeline] local engine: ${message}`);
           // Credits were validated + deducted server-side before we got here.
