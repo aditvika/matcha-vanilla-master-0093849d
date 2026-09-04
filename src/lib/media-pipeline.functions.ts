@@ -186,3 +186,34 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
   });
 
 
+
+/**
+ * Returns the pre-deducted credits when the local ONNX/FFmpeg run fails, so a
+ * crashed device never costs the user anything.
+ */
+export const refundLocalRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      kind: z.enum(["photo", "video"]),
+      resolution: z.enum(["720p", "1080p", "2K", "4K"]),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
+    try {
+      const { supabase } = context;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rpc = (fn: string, args?: unknown) => (supabase.rpc as any)(fn, args);
+      const { data: result } = await rpc("refund_credits", {
+        p_kind: data.kind,
+        p_resolution: data.resolution,
+      });
+      return { ok: Boolean((result ?? {}) && (result as { success?: boolean }).success) };
+    } catch (error) {
+      console.error(
+        "[media-pipeline] refundLocalRun failed",
+        error instanceof Error ? error.message : error,
+      );
+      return { ok: false };
+    }
+  });
