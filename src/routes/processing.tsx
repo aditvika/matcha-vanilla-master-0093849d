@@ -66,6 +66,7 @@ function ProcessingPage() {
   const [statusText, setStatusText] = useState<string | null>(null);
   const startedRef = useRef(false);
   const localRef = useRef(false);
+  const chargedRef = useRef(false);
 
   const duration = isPremium ? 4000 : 30000;
   const messages = isPremium ? PREMIUM_MESSAGES : FREE_MESSAGES;
@@ -180,6 +181,16 @@ function ProcessingPage() {
         broadcastCreditsChanged();
 
         if (result?.ok !== true) {
+          if (chargedRef.current) {
+            chargedRef.current = false;
+            try {
+              await refundLocal({ data: { kind: media.kind, resolution: resolution as "720p" | "1080p" | "2K" | "4K" } });
+              await refreshCreditsGlobal();
+              broadcastCreditsChanged();
+            } catch (refundError) {
+              console.error("[media-pipeline] refund failed:", refundError);
+            }
+          }
           const reason = result?.reason ?? "FAILED";
           const detail = result?.message ? ` (${result.message})` : "";
           if (reason === "RATE_LIMIT") {
@@ -221,7 +232,14 @@ function ProcessingPage() {
           });
         }, 350);
       } catch (error) {
-        // Nothing is charged before a successful result, so the balance is intact.
+        if (chargedRef.current) {
+          chargedRef.current = false;
+          try {
+            await refundLocal({ data: { kind: media.kind, resolution: resolution as "720p" | "1080p" | "2K" | "4K" } });
+          } catch (refundError) {
+            console.error("[media-pipeline] refund failed:", refundError);
+          }
+        }
         await refreshCreditsGlobal();
         broadcastCreditsChanged();
         const detail = error instanceof Error ? error.message : String(error);
@@ -239,7 +257,7 @@ function ProcessingPage() {
         void navigate({ to: "/preview", replace: true });
       }
     })();
-  }, [completeLocalPipeline, media, navigate, path, resolution, runPipeline]);
+  }, [completeLocalPipeline, media, navigate, path, refundLocal, resolution, runPipeline]);
 
 
 
