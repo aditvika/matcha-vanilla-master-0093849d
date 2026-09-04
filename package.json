@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@hookform/resolvers": "^5.2.2",
     "@lovable.dev/cloud-auth-js": "^1.1.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -55,6 +57,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
     "nitro": "3.0.260603-beta",
+    "onnxruntime-web": "^1.29.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.0",
