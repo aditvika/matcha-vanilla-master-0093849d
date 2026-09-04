@@ -61,6 +61,8 @@ function ProcessingPage() {
   const runPipeline = useServerFn(processMedia);
   const completeLocalPipeline = useServerFn(completeLocalMedia);
   const refundLocal = useServerFn(refundLocalRun);
+  const runPhotoTransform = useServerFn(transformPhoto);
+
 
   const [progress, setProgress] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
