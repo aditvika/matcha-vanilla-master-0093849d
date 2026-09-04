@@ -232,7 +232,14 @@ function ProcessingPage() {
           });
         }, 350);
       } catch (error) {
-        // Nothing is charged before a successful result, so the balance is intact.
+        if (chargedRef.current) {
+          chargedRef.current = false;
+          try {
+            await refundLocal({ data: {} });
+          } catch (refundError) {
+            console.error("[media-pipeline] refund failed:", refundError);
+          }
+        }
         await refreshCreditsGlobal();
         broadcastCreditsChanged();
         const detail = error instanceof Error ? error.message : String(error);
