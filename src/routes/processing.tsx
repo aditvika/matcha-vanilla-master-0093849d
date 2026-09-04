@@ -13,7 +13,9 @@ import {
   processMedia,
   refundLocalRun,
 } from "@/lib/media-pipeline.functions";
-import { processMediaLocally } from "@/lib/local-engine";
+import { processMedia as processMediaService } from "@/lib/media-service";
+import { transformPhoto } from "@/lib/photo-transform.functions";
+
 
 import { uploadProcessedMedia } from "@/lib/media-upload";
 import { ensureFreshSession, isAuthError } from "@/lib/session-guard";
@@ -59,6 +61,8 @@ function ProcessingPage() {
   const runPipeline = useServerFn(processMedia);
   const completeLocalPipeline = useServerFn(completeLocalMedia);
   const refundLocal = useServerFn(refundLocalRun);
+  const runPhotoTransform = useServerFn(transformPhoto);
+
 
   const [progress, setProgress] = useState(0);
   const [msgIdx, setMsgIdx] = useState(0);
@@ -126,8 +130,8 @@ function ProcessingPage() {
           chargedRef.current = true;
           toast.info(
             media.kind === "photo"
-              ? "Mode gratis — AI upscaler (Real-ESRGAN) berjalan langsung di perangkat Anda."
-              : "Mode gratis — FFmpeg WebAssembly memproses video di perangkat Anda.",
+              ? "Mode gratis — foto Anda ditingkatkan lewat engine server (stabil & bebas korup)."
+              : "Mode gratis — video full-length diproses ke 720p, durasi tidak dipotong.",
             { duration: 6000 },
           );
 
@@ -136,24 +140,27 @@ function ProcessingPage() {
           setProgress(0);
           setStatusText(
             media.kind === "photo"
-              ? "Local AI Engine — memuat model Real-ESRGAN (ONNX)..."
-              : "Local Video Engine — memuat FFmpeg WebAssembly...",
+              ? "Enhancement Engine — menyiapkan render foto..."
+              : "Video Engine — menyiapkan encode full-length...",
           );
 
-          const local = await processMediaLocally(
-            media.file,
-            media.kind,
-            resolution as "720p" | "1080p" | "2K" | "4K",
-            (fraction: number) => {
-              const pct = Math.min(97, Math.round(fraction * 95));
+          const local = await processMediaService(media.kind, {
+            file: media.file,
+            sourcePath: path,
+            resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+            transform: runPhotoTransform as unknown as typeof transformPhoto,
+            onStatus: (status: string) => setStatusText(status),
+            onProgress: (fraction: number) => {
+              const pct = Math.min(97, Math.round(fraction * 100));
               setProgress(pct);
               setStatusText(
                 media.kind === "photo"
-                  ? `AI merekonstruksi detail ${Math.round(fraction * 100)}% — jangan tutup halaman`
-                  : `FFmpeg WASM mengencode ${Math.round(fraction * 100)}% — jangan tutup halaman`,
+                  ? `Meningkatkan detail foto ${pct}% — jangan tutup halaman`
+                  : `Mengencode video ${pct}% — jangan tutup halaman`,
               );
             },
-          );
+          });
+
           setStatusText("Mengunggah hasil...");
           setProgress(98);
           // Rendering can take minutes; refresh the token before upload.
