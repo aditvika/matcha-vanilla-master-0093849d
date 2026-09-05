@@ -47,7 +47,7 @@ const photoEngine: MediaEngine = async ({
   onStatus,
   transform = transformPhoto,
 }) => {
-  onStatus?.("Server enhancement engine — rendering your photo...");
+  onStatus?.("Cloud server enhancement — rendering your photo...");
   const result = await transform({ data: { path: sourcePath, resolution } });
   if (!result?.ok) {
     throw new Error(result?.message || "Photo engine failed");
@@ -59,8 +59,12 @@ const photoEngine: MediaEngine = async ({
   if (!blob || blob.size < 1024) throw new Error("Enhanced photo output was empty");
 
   const contentType = blob.type || "image/jpeg";
-  return { blob, extension: extensionFor(contentType), contentType };
+  onStatus?.("Applying detail sharpening...");
+  const sharpened = await sharpenPhotoBlob(blob, contentType);
+  const finalType = sharpened.type || contentType;
+  return { blob: sharpened, extension: extensionFor(finalType), contentType: finalType };
 };
+
 
 /**
  * VIDEO ENGINE — full-length, no truncation. Free tier targets 720p so long
