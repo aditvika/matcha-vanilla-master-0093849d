@@ -161,12 +161,12 @@ function ProcessingPage() {
         if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
 
           const message = result?.message ?? "";
-          console.info(`[media-pipeline] local engine: ${message}`);
+          console.info(`[media-pipeline] cloud server engine: ${message}`);
           // Credits were validated + deducted server-side before we got here.
           chargedRef.current = true;
           toast.info(
             media.kind === "photo"
-              ? "Mode gratis — foto Anda ditingkatkan lewat engine server (stabil & bebas korup)."
+              ? "Mode gratis — foto Anda ditingkatkan lewat cloud server (stabil & bebas korup)."
               : "Mode gratis — video full-length diproses ke 720p, durasi tidak dipotong.",
             { duration: 6000 },
           );
@@ -176,26 +176,35 @@ function ProcessingPage() {
           setProgress(0);
           setStatusText(
             media.kind === "photo"
-              ? "Enhancement Engine — menyiapkan render foto..."
-              : "Video Engine — menyiapkan encode full-length...",
+              ? "Cloud Server — menyiapkan render foto..."
+              : "Cloud Server — menyiapkan encode full-length...",
           );
 
-          const local = await processMediaService(media.kind, {
-            file: media.file,
-            sourcePath: path,
-            resolution: resolution as "720p" | "1080p" | "2K" | "4K",
-            transform: runPhotoTransform as unknown as typeof transformPhoto,
-            onStatus: (status: string) => setStatusText(status),
-            onProgress: (fraction: number) => {
-              const pct = Math.min(97, Math.round(fraction * 100));
-              setProgress(pct);
-              setStatusText(
-                media.kind === "photo"
-                  ? `Meningkatkan detail foto ${pct}% — jangan tutup halaman`
-                  : `Mengencode video ${pct}% — jangan tutup halaman`,
-              );
-            },
-          });
+          lastActivityRef.current = Date.now();
+          const local = await withWatchdog(
+            processMediaService(media.kind, {
+              file: media.file,
+              sourcePath: path,
+              resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+              transform: runPhotoTransform as unknown as typeof transformPhoto,
+              onStatus: (status: string) => {
+                lastActivityRef.current = Date.now();
+                setStatusText(status);
+              },
+              onProgress: (fraction: number) => {
+                lastActivityRef.current = Date.now();
+                const pct = Math.min(97, Math.round(fraction * 100));
+                setProgress(pct);
+                setStatusText(
+                  media.kind === "photo"
+                    ? `Meningkatkan detail foto ${pct}% — jangan tutup halaman`
+                    : `Mengencode video ${pct}% — jangan tutup halaman`,
+                );
+              },
+            }),
+            180_000,
+            lastActivityRef,
+          );
 
           setStatusText("Mengunggah hasil...");
           setProgress(98);
@@ -203,20 +212,26 @@ function ProcessingPage() {
           await ensureFreshSession();
           const userId = path.split("/")[0];
           if (!userId) throw new Error("Invalid media upload path");
-          const outputPath = await uploadProcessedMedia(
-            local.blob,
-            userId,
-            local.extension,
-            local.contentType,
+          lastActivityRef.current = Date.now();
+          const outputPath = await withWatchdog(
+            uploadProcessedMedia(local.blob, userId, local.extension, local.contentType),
+            180_000,
+            lastActivityRef,
           );
-          result = await completeLocalPipeline({
-            data: {
-              outputPath,
-              kind: media.kind,
-              resolution: resolution as "720p" | "1080p" | "2K" | "4K",
-            },
-          });
+          lastActivityRef.current = Date.now();
+          result = await withWatchdog(
+            completeLocalPipeline({
+              data: {
+                outputPath,
+                kind: media.kind,
+                resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+              },
+            }),
+            120_000,
+            lastActivityRef,
+          );
         }
+
 
 
         // Always resync from the server clock/balance (charge happens on success only).
