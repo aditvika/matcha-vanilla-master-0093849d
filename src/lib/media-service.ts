@@ -5,6 +5,23 @@
  * Swapping the execution engine later (e.g. native Capacitor plugins in the
  * APK build) means replacing `photoEngine` / `videoEngine` here — no UI or
  * credit-logic rewrite.
+ *
+ * DUAL-TARGET ARCHITECTURE
+ * ------------------------
+ * `EXECUTION_TARGET` selects where media processing actually runs:
+ *
+ *  - 'web'    (default, current browser trial)
+ *             Photos → Supabase storage transformation + client sharpening.
+ *             Videos → local FFmpeg WASM full-length 720p encode.
+ *  - 'native' (future Capacitor APK)
+ *             Photos/Videos → native TFLite/ONNX engine injected through
+ *             `nativeTflitePhoto` / `nativeTfliteVideo`. Until a native
+ *             engine is provided, both safely fall back to the web pipeline.
+ *
+ * The UI (`src/routes/processing.tsx`), the pre-deduction in
+ * `media-pipeline.functions.ts` and the automatic `refundLocalRun` catch path
+ * are all target-agnostic: they call `processPhoto` / `processVideo` and are
+ * never aware of which target satisfied the request.
  */
 
 import { transformPhoto } from "./photo-transform.functions";
@@ -36,6 +53,21 @@ export type ProcessOptions = {
 
 export type MediaEngine = (options: ProcessOptions) => Promise<ProcessedMedia>;
 
+/**
+ * Execution target switcher.
+ *
+ * Defaults to 'web' for the current browser trial. When the Capacitor APK
+ * build lands, set `VITE_EXECUTION_TARGET=native` (or flip the literal below)
+ * and inject real TFLite/ONNX implementations into the native stubs — nothing
+ * else in the app changes.
+ */
+export type ExecutionTarget = "web" | "native";
+
+export const EXECUTION_TARGET: ExecutionTarget = (() => {
+  const raw = typeof import.meta !== "undefined" ? import.meta.env?.VITE_EXECUTION_TARGET : undefined;
+  return raw === "native" ? "native" : "web";
+})();
+
 function extensionFor(type: string): ProcessedMedia["extension"] {
   if (type.includes("png")) return "png";
   return "jpg";
@@ -50,11 +82,15 @@ function extensionFor(type: string): ProcessedMedia["extension"] {
 const PHOTO_TIMEOUT_MS = 120_000;
 const VIDEO_TIMEOUT_MS = 45_000;
 
+/* ------------------------------------------------------------------ */
+/* WEB ENGINES (current browser trial)                                 */
+/* ------------------------------------------------------------------ */
+
 /**
- * PHOTO ENGINE — server-side transformation/sharpening endpoint.
+ * WEB PHOTO ENGINE — server-side transformation/sharpening endpoint.
  * No browser ONNX/WebGL: the browser only downloads the rendered result.
  */
-const photoEngine: MediaEngine = async ({
+const webPhotoEngine: MediaEngine = async ({
   sourcePath,
   resolution,
   onStatus,
@@ -84,19 +120,70 @@ const photoEngine: MediaEngine = async ({
   return { blob: sharpened, extension: extensionFor(finalType), contentType: finalType };
 };
 
-
 /**
- * VIDEO ENGINE — full-length, no truncation. Free tier targets 720p so long
- * clips stay inside a safe encoding envelope while keeping every second of
- * the original input and its audio track.
+ * WEB VIDEO ENGINE — full-length, no truncation. Free tier targets 720p so
+ * long clips stay inside a safe encoding envelope while keeping every second
+ * of the original input and its audio track.
  */
-const videoEngine: MediaEngine = async ({ file, resolution, onProgress, onStatus }) => {
+const webVideoEngine: MediaEngine = async ({ file, resolution, onProgress, onStatus }) => {
   onStatus?.("Video engine — preparing full-length encode...");
   const target: Resolution = resolution === "720p" ? "720p" : resolution;
   const out = await upscaleVideoLocally(file, target, onProgress);
   if (!out.blob || out.blob.size < 1024) throw new Error("Video output was empty");
   return out;
 };
+
+/* ------------------------------------------------------------------ */
+/* NATIVE ENGINES (future Capacitor APK — TFLite / ONNX)               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Native engine handle. A future Capacitor build injects its real TFLite/ONNX
+ * implementation here (e.g. via `setNativeEngines({ photo: ..., video: ... })`
+ * at app startup). The signature is identical to a web `MediaEngine`, so the
+ * shared `run()` wrapper — timeouts, pacing, aborts — applies unchanged.
+ */
+export type NativeEngines = {
+  photo?: MediaEngine;
+  video?: MediaEngine;
+};
+
+let nativeEngines: NativeEngines = {};
+
+/** Called once by the native shell to inject real on-device engines. */
+export function setNativeEngines(engines: NativeEngines) {
+  nativeEngines = engines;
+}
+
+/**
+ * NATIVE PHOTO STUB — placeholder for the future on-device TFLite/ONNX
+ * Real-ESRGAN engine. Falls back to the web pipeline until injected.
+ */
+const nativeTflitePhoto: MediaEngine = async (options) => {
+  if (nativeEngines.photo) return nativeEngines.photo(options);
+  options.onStatus?.("Native engine not installed — using cloud server...");
+  return webPhotoEngine(options);
+};
+
+/**
+ * NATIVE VIDEO STUB — placeholder for the future on-device video engine.
+ * Falls back to the web pipeline until injected.
+ */
+const nativeTfliteVideo: MediaEngine = async (options) => {
+  if (nativeEngines.video) return nativeEngines.video(options);
+  options.onStatus?.("Native engine not installed — using web encode...");
+  return webVideoEngine(options);
+};
+
+/* ------------------------------------------------------------------ */
+/* UNIFIED DISPATCH (target switch lives here, nowhere else)           */
+/* ------------------------------------------------------------------ */
+
+const photoEngine: MediaEngine =
+  EXECUTION_TARGET === "native" ? nativeTflitePhoto : webPhotoEngine;
+
+const videoEngine: MediaEngine =
+  EXECUTION_TARGET === "native" ? nativeTfliteVideo : webVideoEngine;
 
 async function run(engine: MediaEngine, options: ProcessOptions, kind: "photo" | "video") {
   const pacer = startPacer(kind === "photo" ? PHOTO_PACE : VIDEO_PACE, (f) =>
