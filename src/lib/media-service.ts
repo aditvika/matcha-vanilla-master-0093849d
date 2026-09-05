@@ -30,6 +30,8 @@ export type ProcessOptions = {
   onStatus?: (status: string) => void;
   /** Injectable server caller (useServerFn wrapper) for auth-attached calls. */
   transform?: typeof transformPhoto;
+  /** Abort signal wired to the hard engine timeout. */
+  signal?: AbortSignal;
 };
 
 export type MediaEngine = (options: ProcessOptions) => Promise<ProcessedMedia>;
@@ -40,6 +42,15 @@ function extensionFor(type: string): ProcessedMedia["extension"] {
 }
 
 /**
+ * Hard engine deadlines. If the engine has not resolved by then, the
+ * AbortController fires (cancelling any in-flight fetch) and a
+ * "Processing timeout" error is thrown so the caller's catch block —
+ * and its automatic credit refund — always executes.
+ */
+const PHOTO_TIMEOUT_MS = 120_000;
+const VIDEO_TIMEOUT_MS = 45_000;
+
+/**
  * PHOTO ENGINE — server-side transformation/sharpening endpoint.
  * No browser ONNX/WebGL: the browser only downloads the rendered result.
  */
@@ -48,16 +59,22 @@ const photoEngine: MediaEngine = async ({
   resolution,
   onStatus,
   transform = transformPhoto,
+  signal,
 }) => {
+  const throwIfAborted = () => {
+    if (signal?.aborted) throw new Error("Processing timeout");
+  };
   onStatus?.("Cloud server enhancement — rendering your photo...");
   const result = await transform({ data: { path: sourcePath, resolution } });
+  throwIfAborted();
   if (!result?.ok) {
     throw new Error(result?.message || "Photo engine failed");
   }
 
-  const response = await fetch(result.url);
+  const response = await fetch(result.url, { signal });
   if (!response.ok) throw new Error(`Could not download the enhanced photo (${response.status})`);
   const blob = await response.blob();
+  throwIfAborted();
   if (!blob || blob.size < 1024) throw new Error("Enhanced photo output was empty");
 
   const contentType = blob.type || "image/jpeg";
@@ -85,13 +102,24 @@ async function run(engine: MediaEngine, options: ProcessOptions, kind: "photo" |
   const pacer = startPacer(kind === "photo" ? PHOTO_PACE : VIDEO_PACE, (f) =>
     options.onProgress?.(f),
   );
+  const controller = new AbortController();
+  const timeoutMs = kind === "video" ? VIDEO_TIMEOUT_MS : PHOTO_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const result = await engine({ ...options, onProgress: (f) => pacer.report(f) });
+    const result = await engine({
+      ...options,
+      signal: controller.signal,
+      onProgress: (f) => pacer.report(f),
+    });
     pacer.finish();
     return result;
   } catch (error) {
     pacer.stop();
+    // Normalize aborts into a clean timeout error so the caller refunds + toasts.
+    if (controller.signal.aborted) throw new Error("Processing timeout");
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
