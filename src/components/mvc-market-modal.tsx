@@ -72,7 +72,7 @@ export function MvcMarketModal({
     const label = `${t(pack.nameKey)} (${pack.coins} MVC)`;
     const email = user?.email ?? "-";
     const text =
-      `Halo Admin MVMaster, saya mau top up ${label}.\n\n` +
+      `Halo Admin MVMaster X, saya mau top up ${label}.\n\n` +
       `Email Akun: ${email}\n` +
       `Total: ${pack.idr} / ${pack.usd}`;
     window.open(

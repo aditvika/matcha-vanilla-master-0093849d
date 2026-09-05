@@ -77,13 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MVMaster — Matcha Vanilla Production" },
+      { title: "MVMaster X — Matcha Vanilla Production" },
       {
         name: "description",
-        content: "MVMaster by Matcha Vanilla Production for premium AI creative tools.",
+        content: "MVMaster X by Matcha Vanilla Production for premium AI creative tools.",
       },
       { name: "author", content: "Matcha Vanilla Production" },
-      { property: "og:title", content: "MVMaster — Matcha Vanilla Production" },
+      { property: "og:title", content: "MVMaster X — Matcha Vanilla Production" },
       {
         property: "og:description",
         content: "Premium AI creative tools for photo enhancement, video upscale, and more.",
@@ -97,6 +97,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/icons/icon-192.png" },
     ],
   }),
   shellComponent: RootShell,

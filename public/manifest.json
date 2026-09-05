@@ -1,0 +1,18 @@
+{
+  "name": "MVMaster X",
+  "short_name": "MVMaster X",
+  "description": "MVMaster X by Matcha Vanilla Production — premium AI creative tools for photo enhancement, video upscaling, watermark removal, and more.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#10141f",
+  "theme_color": "#10141f",
+  "categories": ["photo", "productivity", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

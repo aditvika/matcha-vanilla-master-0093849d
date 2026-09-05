@@ -15,17 +15,17 @@ export function PremiumModal({ open, onOpenChange, onUnderstand }: { open: boole
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="premium-modal-title">Fitur Premium MVMaster</DialogTitle>
+          <DialogTitle className="premium-modal-title">Fitur Premium MVMaster X</DialogTitle>
           <DialogDescription className="premium-modal-desc" asChild>
             <div>
               <p className="premium-modal-line">Halo Teman-teman Kreatif! ✨</p>
 
               <p className="premium-modal-line">
-                Pertama-tama, terima kasih banyak sudah mendukung dan memercayakan kebutuhan HD foto/video kamu di MVMaster.
+                Pertama-tama, terima kasih banyak sudah mendukung dan memercayakan kebutuhan HD foto/video kamu di MVMaster X.
               </p>
 
               <p className="premium-modal-line">
-                Perlu diketahui, saat ini aplikasi MVMaster masih berada dalam tahap{" "}
+                Perlu diketahui, saat ini aplikasi MVMaster X masih berada dalam tahap{" "}
                 <strong>pengembangan aktif</strong>. Kami berkomitmen penuh untuk selalu memberikan hasil up-scaling AI yang{" "}
                 <strong>nyata, jujur, dan berkualitas tinggi</strong> tanpa iming-iming palsu.
               </p>
@@ -67,10 +67,10 @@ export function PremiumModal({ open, onOpenChange, onUnderstand }: { open: boole
               </p>
 
               <p className="premium-modal-line">
-                Mari kita bangun MVMaster menjadi aplikasi yang lebih sempurna sama-sama! 🚀
+                Mari kita bangun MVMaster X menjadi aplikasi yang lebih sempurna sama-sama! 🚀
               </p>
 
-              <p className="premium-modal-signature">— Adityo Saputra (Developer MVMaster)</p>
+              <p className="premium-modal-signature">— Adityo Saputra (Developer MVMaster X)</p>
             </div>
           </DialogDescription>
         </DialogHeader>

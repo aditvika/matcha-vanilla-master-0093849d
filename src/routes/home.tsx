@@ -251,7 +251,7 @@ function HomePage() {
           <button
             type="button"
             className="home-featured"
-            aria-label="MVMaster Premium"
+            aria-label="MVMaster X Premium"
             onClick={() => setPremiumOpen(true)}
           >
             <div className="home-featured-glow" aria-hidden />
