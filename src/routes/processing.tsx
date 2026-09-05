@@ -52,7 +52,35 @@ const PREMIUM_MESSAGES = [
   "Rendering at ultra quality...",
 ];
 
+/** Rejects when no progress has been reported for `stallMs`, so a silent
+ *  server hang always reaches the catch block (loader stops + credit refund). */
+function withWatchdog<T>(
+  work: Promise<T>,
+  stallMs: number,
+  lastActivity: { current: number },
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivity.current > stallMs) {
+        clearInterval(timer);
+        reject(new Error("Proses tidak merespons (timeout). Kredit dikembalikan."));
+      }
+    }, 1000);
+    work.then(
+      (value) => {
+        clearInterval(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearInterval(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function ProcessingPage() {
+
   const { media } = useSelectedMedia();
   const { isPremium } = usePremiumStatus();
   useCredits();
