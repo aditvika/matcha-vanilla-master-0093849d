@@ -99,6 +99,8 @@ function ProcessingPage() {
   const startedRef = useRef(false);
   const localRef = useRef(false);
   const chargedRef = useRef(false);
+  const lastActivityRef = useRef(Date.now());
+
 
   const duration = isPremium ? 4000 : 30000;
   const messages = isPremium ? PREMIUM_MESSAGES : FREE_MESSAGES;
