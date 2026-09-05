@@ -331,7 +331,7 @@ function ProcessingPage() {
           ) : (
             <Loader2 size={14} className="proc-spin" />
           )}
-          <span>{localMode ? "LOCAL ENGINE" : isPremium ? "PRIORITY LANE" : "STANDARD LANE"}</span>
+          <span>{localMode ? "CLOUD SERVER" : isPremium ? "PRIORITY LANE" : "STANDARD LANE"}</span>
         </div>
 
         {isPremium && !localMode ? (
