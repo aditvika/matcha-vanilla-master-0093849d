@@ -50,7 +50,7 @@ function ResultPage() {
         ? ".mp4"
         : ".jpg";
     const base = media.file.name.replace(/\.[^.]+$/, "") || "media";
-    const filename = `MVMaster_${resolution}_${base}${ext}`;
+    const filename = `MVMaster X_${resolution}_${base}${ext}`;
 
     try {
       // Fetch to blob first so cross-origin storage URLs download properly.

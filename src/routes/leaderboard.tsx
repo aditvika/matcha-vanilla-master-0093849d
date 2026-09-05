@@ -14,8 +14,8 @@ type Search = { tab?: LeaderTab };
 export const Route = createFileRoute("/leaderboard")({
   head: () => ({
     meta: [
-      { title: "Premium Leaderboard — MVMaster" },
-      { name: "description", content: "Top ranking of MVMaster premium members." },
+      { title: "Premium Leaderboard — MVMaster X" },
+      { name: "description", content: "Top ranking of MVMaster X premium members." },
     ],
   }),
   validateSearch: (s: Record<string, unknown>): Search => {

@@ -6,17 +6,17 @@ import splashAsset from "@/assets/splash.jpg.asset.json";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MV AV Studio — AI Photo & Video Upscaling" },
+      { title: "MVMaster X — AI Photo & Video Upscaling" },
       {
         name: "description",
         content:
-          "MV AV Studio — enhance photos and upscale videos with AI, powered by Gemini AI & Fal.AI.",
+          "MVMaster X — enhance photos and upscale videos with AI, powered by Gemini AI & Fal.AI.",
       },
-      { property: "og:title", content: "MV AV Studio — AI Photo & Video Upscaling" },
+      { property: "og:title", content: "MVMaster X — AI Photo & Video Upscaling" },
       {
         property: "og:description",
         content:
-          "MV AV Studio — enhance photos and upscale videos with AI, powered by Gemini AI & Fal.AI.",
+          "MVMaster X — enhance photos and upscale videos with AI, powered by Gemini AI & Fal.AI.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -51,7 +51,7 @@ function SplashScreen() {
     <main className="splash-root splash-fade-in">
       <img
         src={splashAsset.url}
-        alt="MV AV Studio — powered by Gemini AI & Fal.AI"
+        alt="MVMaster X — powered by Gemini AI & Fal.AI"
         className="splash-image"
       />
     </main>

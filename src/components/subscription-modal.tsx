@@ -253,8 +253,8 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
             onClick={() => {
               const email = user?.email ?? "-";
               const text =
-                `Halo Admin MVMaster, saya ingin berlangganan paket ${selected.name} ` +
-                `(${selected.price}${selected.period}) untuk akun MVMaster saya.\n\n` +
+                `Halo Admin MVMaster X, saya ingin berlangganan paket ${selected.name} ` +
+                `(${selected.price}${selected.period}) untuk akun MVMaster X saya.\n\n` +
                 `Email Akun: ${email}`;
               window.open(
                 `https://wa.me/62895365351729?text=${encodeURIComponent(text)}`,
