@@ -10,6 +10,8 @@
 import { transformPhoto } from "./photo-transform.functions";
 import { upscaleVideoLocally, type VideoResolution } from "./ffmpeg-video";
 import { PHOTO_PACE, VIDEO_PACE, startPacer } from "./progress-pacer";
+import { sharpenPhotoBlob } from "./photo-sharpen";
+
 
 export type Resolution = VideoResolution;
 
