@@ -43,11 +43,35 @@ function ResultPage() {
 
   const outUrl = output ?? media.url;
 
-  const handleDownload = () => {
-    const a = document.createElement("a");
-    a.href = outUrl;
-    a.download = `enhanced_${resolution}_${media.file.name}`;
-    a.click();
+  const handleDownload = async () => {
+    const ext = media.file.name.includes(".")
+      ? media.file.name.slice(media.file.name.lastIndexOf("."))
+      : isVideo
+        ? ".mp4"
+        : ".jpg";
+    const base = media.file.name.replace(/\.[^.]+$/, "") || "media";
+    const filename = `MVMaster_${resolution}_${base}${ext}`;
+
+    try {
+      // Fetch to blob first so cross-origin storage URLs download properly.
+      const res = await fetch(outUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+    } catch {
+      // Fallback: direct URL download.
+      const a = document.createElement("a");
+      a.href = outUrl;
+      a.download = filename;
+      a.click();
+    }
   };
 
   return (
@@ -75,9 +99,9 @@ function ResultPage() {
       </section>
 
       <section className="result-actions">
-        <button type="button" className="result-download" onClick={handleDownload}>
+        <button type="button" className="result-download" onClick={() => void handleDownload()}>
           <Download size={18} />
-          Download to Gallery
+          Unduh Hasil
         </button>
         <button type="button" className="result-secondary" onClick={goHome}>
           Back to Home

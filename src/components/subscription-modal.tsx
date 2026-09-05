@@ -251,7 +251,19 @@ export function SubscriptionModal({ open, onOpenChange }: SubscriptionModalProps
             size="sm"
             className="w-full h-9 text-xs"
             onClick={() => {
-              toast.info('Klik "Punya Kode Voucher?" untuk mengaktifkan paket dengan kode.');
+              const email = user?.email ?? "-";
+              const text =
+                `Halo Admin MVMaster, saya ingin berlangganan paket ${selected.name} ` +
+                `(${selected.price}${selected.period}) untuk akun MVMaster saya.\n\n` +
+                `Email Akun: ${email}`;
+              window.open(
+                `https://wa.me/62895365351729?text=${encodeURIComponent(text)}`,
+                "_blank",
+                "noopener,noreferrer",
+              );
+              toast.info(
+                'Lanjutkan pembayaran via WhatsApp. Punya kode? Klik "Punya Kode Voucher?" untuk aktivasi instan.',
+              );
             }}
           >
             Pilih {selected.tab}
