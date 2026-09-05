@@ -30,6 +30,8 @@ export type ProcessOptions = {
   onStatus?: (status: string) => void;
   /** Injectable server caller (useServerFn wrapper) for auth-attached calls. */
   transform?: typeof transformPhoto;
+  /** Abort signal wired to the hard engine timeout. */
+  signal?: AbortSignal;
 };
 
 export type MediaEngine = (options: ProcessOptions) => Promise<ProcessedMedia>;
