@@ -144,13 +144,19 @@ function ProcessingPage() {
           message?: string;
           outputUrl?: string;
         };
-        let result: LooseResult = ((await runPipeline({
-          data: {
-            path,
-            kind: media.kind,
-            resolution: resolution as "720p" | "1080p" | "2K" | "4K",
-          },
-        })) ?? { ok: false, reason: "FAILED" }) as LooseResult;
+        lastActivityRef.current = Date.now();
+        let result: LooseResult = ((await withWatchdog(
+          runPipeline({
+            data: {
+              path,
+              kind: media.kind,
+              resolution: resolution as "720p" | "1080p" | "2K" | "4K",
+            },
+          }),
+          120_000,
+          lastActivityRef,
+        )) ?? { ok: false, reason: "FAILED" }) as LooseResult;
+
 
         if (result?.ok !== true && result?.reason === "LOCAL_FALLBACK") {
 
