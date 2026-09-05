@@ -99,9 +99,9 @@ function ResultPage() {
       </section>
 
       <section className="result-actions">
-        <button type="button" className="result-download" onClick={handleDownload}>
+        <button type="button" className="result-download" onClick={() => void handleDownload()}>
           <Download size={18} />
-          Download to Gallery
+          Unduh Hasil
         </button>
         <button type="button" className="result-secondary" onClick={goHome}>
           Back to Home
