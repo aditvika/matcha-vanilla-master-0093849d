@@ -3,10 +3,8 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.mvmaster.app",
-      "sha256_cert_fingerprints": [
-        "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"
-      ]
+      "package_name": "app.lovable.matcha_vanilla_master.twa",
+      "sha256_cert_fingerprints": ["45:56:10:9E:8E:43:2F:18:36:68:BB:09:50:05:94:3B:2E:D1:B5:E2:C7:70:30:24:05:90:E5:B9:A8:9C:33:49"]
     }
   }
 ]
