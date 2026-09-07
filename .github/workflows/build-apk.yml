@@ -37,41 +37,8 @@ jobs:
 
       # The app builds as an SSR bundle (no static index.html), so render the
       # splash route once via `vite preview` and save it as the static shell
-      # that Capacitor uses as its entry point.
-      - name: Generate static index.html shell
-        run: |
-          cat > .output/server/server.js <<'EOF'
-          import mod from "./index.mjs";
-
-          export default {
-            fetch(req, env, ctx) {
-              const extra = {};
-              const proxy = new Proxy(req, {
-                get(t, k) {
-                  if (k in extra) return extra[k];
-                  const v = Reflect.get(t, k);
-                  return typeof v === "function" ? v.bind(t) : v;
-                },
-                set(t, k, v) { extra[k] = v; return true; },
-                has(t, k) { return k in extra || k in t; },
-              });
-              return mod.fetch(proxy, env ?? {}, ctx ?? { waitUntil() {} });
-            },
-          };
-          EOF
-          npx vite preview --port 4173 >/tmp/preview.log 2>&1 &
-          PREVIEW_PID=$!
-          ok=0
-          for i in $(seq 1 30); do
-            curl -sf -o .output/public/index.html http://localhost:4173/ && { ok=1; break; }
-            sleep 1
-          done
-          kill $PREVIEW_PID 2>/dev/null || true
-          if [ "$ok" != "1" ]; then
-            echo "Failed to render static shell"; tail -30 /tmp/preview.log; exit 1
-          fi
-          grep -q '<div id="root">' .output/public/index.html || grep -qa 'assets/' .output/public/index.html || { echo "Static shell looks invalid"; exit 1; }
-          ls -lh .output/public/index.html
+      # that Capacitor uses as its entry point 
+      
       - name: Add or sync Capacitor Android platform
         run: |
           ./node_modules/.bin/cap --version
