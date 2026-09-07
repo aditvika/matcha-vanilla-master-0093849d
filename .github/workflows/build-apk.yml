@@ -32,8 +32,8 @@ jobs:
       - name: Build web app
         run: |
           npm run build
-          test -d dist/client || { echo "Build output missing: dist/client"; exit 1; }
-          ls -lh dist/client
+          test -d .output/public || { echo "Build output missing: .output/public"; exit 1; }
+          ls -lh .output/public
 
       # The app builds as an SSR bundle (no static index.html), so render the
       # splash route once via `vite preview` and save it as the static shell
@@ -70,9 +70,8 @@ jobs:
           if [ "$ok" != "1" ]; then
             echo "Failed to render static shell"; tail -30 /tmp/preview.log; exit 1
           fi
-          grep -q '<div id="root">' dist/client/index.html || grep -qa 'assets/' dist/client/index.html || { echo "Static shell looks invalid"; exit 1; }
-          ls -lh dist/client/index.html
-
+          grep -q '<div id="root">' .output/public/index.html || grep -qa 'assets/' .output/public/index.html || { echo "Static shell looks invalid"; exit 1; }
+          ls -lh .output/public/index.html
       - name: Add or sync Capacitor Android platform
         run: |
           ./node_modules/.bin/cap --version
