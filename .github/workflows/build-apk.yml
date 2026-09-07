@@ -34,31 +34,6 @@ jobs:
           npm run build
           test -d .output/public || { echo "Build output missing: .output/public"; exit 1; }
           ls -lh .output/public 
-          
-      
-      - name: Generate SPA index.html for Capacitor
-        run: |
-          node -e '
-            const fs = require("fs");
-            const files = fs.readdirSync(".output/public/assets");
-            const js = files.find(f => f.endsWith(".js") && f.includes("index"));
-            const css = files.find(f => f.endsWith(".css"));
-            const html = `<!DOCTYPE html>
-            <html lang="en">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>MVMaster X</title>
-              \${css ? \`<link rel="stylesheet" crossorigin href="./assets/\${css}">\` : ""}
-            </head>
-            <body>
-              <div id="root"></div>
-              \${js ? \`<script type="module" crossorigin src="./assets/\${js}"></script>\` : ""}
-            </body>
-            </html>`;
-            fs.writeFileSync(".output/public/index.html", html);
-            console.log("Generated index.html successfully!");
-          '
       
       - name: Add or sync Capacitor Android platform
         run: |
