@@ -30,15 +30,19 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Build web app
-        run: npm run build
+        run: |
+          npm run build
+          test -f dist/client/index.html || { echo "Build output missing: dist/client/index.html"; exit 1; }
+          ls -lh dist/client
 
       - name: Add or sync Capacitor Android platform
         run: |
+          ./node_modules/.bin/cap --version
           if [ -d "android" ]; then
-            npx cap sync android
+            ./node_modules/.bin/cap sync android
           else
-            npx cap add android
-            npx cap sync android
+            ./node_modules/.bin/cap add android
+            ./node_modules/.bin/cap sync android
           fi
 
       - name: Build debug APK with Gradle
