@@ -7,7 +7,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   vite: {
-    base: './',
+    // NOTE: do NOT set `base: './'` — a relative base makes server-function
+    // calls resolve against the current page path (e.g. /processing/_serverFn/...),
+    // which returns the HTML router instead of JSON.
+    base: '/',
+
     build: {
 
       rollupOptions: {
