@@ -195,8 +195,9 @@ function ProcessingPage() {
               },
               onProgress: (fraction: number) => {
                 lastActivityRef.current = Date.now();
-                const pct = Math.min(97, Math.round(fraction * 100));
+                const pct = Math.min(99, Math.round(fraction * 100));
                 setProgress(pct);
+
                 setStatusText(
                   media.kind === "photo"
                     ? `Meningkatkan detail foto ${pct}% — jangan tutup halaman`
