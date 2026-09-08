@@ -6,9 +6,10 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
-  base: './', //
   vite: {
+    base: './',
     build: {
+
       rollupOptions: {
         output: {
           entryFileNames: `assets/index.js`,
