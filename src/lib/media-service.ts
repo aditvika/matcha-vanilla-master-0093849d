@@ -80,7 +80,10 @@ function extensionFor(type: string): ProcessedMedia["extension"] {
  * and its automatic credit refund — always executes.
  */
 const PHOTO_TIMEOUT_MS = 120_000;
-const VIDEO_TIMEOUT_MS = 45_000;
+// Full-length encodes legitimately take minutes; the engine has its own
+// stall detector, this is only the absolute ceiling.
+const VIDEO_TIMEOUT_MS = 8 * 60_000;
+
 
 /* ------------------------------------------------------------------ */
 /* WEB ENGINES (current browser trial)                                 */
