@@ -159,14 +159,29 @@ export const completeLocalMedia = createServerFn({ method: "POST" })
         return { ok: false, reason: "FAILED", message: "Could not open processed output" };
       }
 
-      // Credits were already deducted by the pre-execution gate in processMedia.
+      // ---- Charge ONLY now: a verified, signed output URL exists. ----
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rpc = (fn: string, args?: unknown) => (supabase.rpc as any)(fn, args);
+      const { data: charge } = await rpc("consume_credits", {
+        p_kind: data.kind,
+        p_resolution: data.resolution,
+      });
+      const c = (charge ?? {}) as { success?: boolean; cost?: number; reason?: string };
+      if (!c.success) {
+        return {
+          ok: false,
+          reason: c.reason === "LOCKED" ? "LOCKED" : "INSUFFICIENT_CREDITS",
+        };
+      }
+
       return {
         ok: true,
         outputUrl: signed.signedUrl,
         engine: "client",
         tier: "free",
-        charged: 0,
+        charged: Number(c.cost ?? 0),
       };
+
 
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
