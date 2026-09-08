@@ -56,10 +56,15 @@ function isMobile() {
 // Mobile safety comes from capping the output height instead.
 const MOBILE_MAX_HEIGHT = 720;
 
+/** Hard wall-clock cap for one encode, plus a "no progress" stall cap. */
+const HARD_DEADLINE_MS = 8 * 60_000;
+const STALL_MS = 90_000;
+
 export async function upscaleVideoLocally(
   file: File,
   resolution: VideoResolution,
   onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
 ): Promise<{ blob: Blob; extension: "mp4"; contentType: "video/mp4" }> {
   const mobile = isMobile();
 
@@ -67,17 +72,53 @@ export async function upscaleVideoLocally(
   const requested = TARGET_HEIGHT[resolution];
   const height = mobile ? Math.min(requested, MOBILE_MAX_HEIGHT) : requested;
 
+  let lastFraction = -1;
+  let lastMove = Date.now();
 
   const handleProgress = ({ progress }: { progress: number }) => {
-    if (Number.isFinite(progress)) onProgress?.(Math.max(0, Math.min(1, progress)));
+    if (!Number.isFinite(progress)) return;
+    const f = Math.max(0, Math.min(1, progress));
+    // Only a genuine forward move counts as activity — a stuck encoder that
+    // keeps re-emitting the same fraction must NOT keep the watchdog alive.
+    if (f > lastFraction + 0.0005) {
+      lastFraction = f;
+      lastMove = Date.now();
+      onProgress?.(f);
+    }
   };
   ffmpeg.on("progress", handleProgress);
 
   const inputName = "input.bin";
   const outputName = "output.mp4";
 
+  // Any abort/timeout must kill the worker, otherwise the promise never settles.
+  let watchdog: ReturnType<typeof setInterval> | undefined;
+  let failure: Error | undefined;
+  const abort = (error: Error) => {
+    if (failure) return;
+    failure = error;
+    try {
+      ffmpeg.terminate();
+    } catch {
+      /* worker already gone */
+    }
+    ffmpegPromise = null;
+  };
+  const onExternalAbort = () => abort(new Error("Processing timeout"));
+  signal?.addEventListener("abort", onExternalAbort);
+
   try {
+    if (signal?.aborted) throw new Error("Processing timeout");
     await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+    const started = Date.now();
+    watchdog = setInterval(() => {
+      if (Date.now() - started > HARD_DEADLINE_MS) {
+        abort(new Error("Encoding melebihi batas waktu maksimum."));
+      } else if (Date.now() - lastMove > STALL_MS) {
+        abort(new Error("Encoding berhenti merespons."));
+      }
+    }, 2000);
 
     const filter = mobile
       ? `scale=-2:${height}:flags=bicubic`
@@ -107,9 +148,11 @@ export async function upscaleVideoLocally(
       outputName,
     ]);
 
+    if (failure) throw failure;
     if (code !== 0) throw new Error(`FFmpeg exited with code ${code}`);
 
     const data = await ffmpeg.readFile(outputName);
+    if (failure) throw failure;
     const bytes = data instanceof Uint8Array ? data : new TextEncoder().encode(String(data));
     if (!bytes || bytes.byteLength < 1024) {
       throw new Error("Hasil video tidak valid (file kosong). Coba klip yang lebih pendek.");
@@ -120,10 +163,17 @@ export async function upscaleVideoLocally(
       extension: "mp4",
       contentType: "video/mp4",
     };
+  } catch (error) {
+    throw failure ?? error;
   } finally {
-    ffmpeg.off("progress", handleProgress);
-    await ffmpeg.deleteFile(inputName).catch(() => undefined);
-    await ffmpeg.deleteFile(outputName).catch(() => undefined);
+    if (watchdog) clearInterval(watchdog);
+    signal?.removeEventListener("abort", onExternalAbort);
+    if (!failure) {
+      ffmpeg.off("progress", handleProgress);
+      await ffmpeg.deleteFile(inputName).catch(() => undefined);
+      await ffmpeg.deleteFile(outputName).catch(() => undefined);
+    }
   }
 }
+
 
