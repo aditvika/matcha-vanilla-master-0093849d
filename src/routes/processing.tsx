@@ -162,8 +162,10 @@ function ProcessingPage() {
 
           const message = result?.message ?? "";
           console.info(`[media-pipeline] cloud server engine: ${message}`);
-          // Credits were validated + deducted server-side before we got here.
-          chargedRef.current = true;
+          // Nothing has been charged yet — credits are consumed server-side
+          // only after a verified output URL comes back from completeLocalMedia.
+          chargedRef.current = false;
+
           toast.info(
             media.kind === "photo"
               ? "Mode gratis — foto Anda ditingkatkan lewat cloud server (stabil & bebas korup)."
@@ -193,8 +195,9 @@ function ProcessingPage() {
               },
               onProgress: (fraction: number) => {
                 lastActivityRef.current = Date.now();
-                const pct = Math.min(97, Math.round(fraction * 100));
+                const pct = Math.min(99, Math.round(fraction * 100));
                 setProgress(pct);
+
                 setStatusText(
                   media.kind === "photo"
                     ? `Meningkatkan detail foto ${pct}% — jangan tutup halaman`

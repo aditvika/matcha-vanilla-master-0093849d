@@ -80,7 +80,10 @@ function extensionFor(type: string): ProcessedMedia["extension"] {
  * and its automatic credit refund — always executes.
  */
 const PHOTO_TIMEOUT_MS = 120_000;
-const VIDEO_TIMEOUT_MS = 45_000;
+// Full-length encodes legitimately take minutes; the engine has its own
+// stall detector, this is only the absolute ceiling.
+const VIDEO_TIMEOUT_MS = 8 * 60_000;
+
 
 /* ------------------------------------------------------------------ */
 /* WEB ENGINES (current browser trial)                                 */
@@ -125,13 +128,14 @@ const webPhotoEngine: MediaEngine = async ({
  * long clips stay inside a safe encoding envelope while keeping every second
  * of the original input and its audio track.
  */
-const webVideoEngine: MediaEngine = async ({ file, resolution, onProgress, onStatus }) => {
+const webVideoEngine: MediaEngine = async ({ file, resolution, onProgress, onStatus, signal }) => {
   onStatus?.("Video engine — preparing full-length encode...");
   const target: Resolution = resolution === "720p" ? "720p" : resolution;
-  const out = await upscaleVideoLocally(file, target, onProgress);
+  const out = await upscaleVideoLocally(file, target, onProgress, signal);
   if (!out.blob || out.blob.size < 1024) throw new Error("Video output was empty");
   return out;
 };
+
 
 /* ------------------------------------------------------------------ */
 /* NATIVE ENGINES (future Capacitor APK — TFLite / ONNX)               */
