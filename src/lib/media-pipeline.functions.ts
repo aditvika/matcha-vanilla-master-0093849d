@@ -72,27 +72,17 @@ export const processMedia = createServerFn({ method: "POST" })
         return { ok: false, reason: "INSUFFICIENT_CREDITS" };
       }
 
-      // ---- FREE TIER: no external API. Local ONNX/FFmpeg engine handles it. ----
-      // Security gate: credits are deducted here, BEFORE the local WebAssembly
-      // script is allowed to run. A failed local run refunds via refundLocalRun.
+      // ---- FREE TIER: no external API. Local FFmpeg/cloud engine handles it. ----
+      // NOTHING is charged here. Credits are consumed only in
+      // `completeLocalMedia`, after a verified output file exists.
       if (!isPaid) {
-        const { data: gate } = await rpc("consume_credits", {
-          p_kind: kind,
-          p_resolution: resolution,
-        });
-        const g = (gate ?? {}) as { success?: boolean; reason?: string };
-        if (!g.success) {
-          return {
-            ok: false,
-            reason: g.reason === "LOCKED" ? "LOCKED" : "INSUFFICIENT_CREDITS",
-          };
-        }
         return {
           ok: false,
           reason: "LOCAL_FALLBACK",
           message: "Free tier uses the on-device AI engine.",
         };
       }
+
 
 
       const { data: signed, error: signErr } = await supabase.storage
