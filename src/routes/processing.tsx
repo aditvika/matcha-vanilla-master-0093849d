@@ -100,6 +100,7 @@ function ProcessingPage() {
   const localRef = useRef(false);
   const chargedRef = useRef(false);
   const lastActivityRef = useRef(Date.now());
+  const lastEngineProgressRef = useRef(-1);
 
 
   const duration = isPremium ? 4000 : 30000;
@@ -194,8 +195,14 @@ function ProcessingPage() {
                 setStatusText(status);
               },
               onProgress: (fraction: number) => {
-                lastActivityRef.current = Date.now();
                 const pct = Math.min(99, Math.round(fraction * 100));
+                // The pacer emits unchanged values for smooth rendering. Only
+                // genuine forward engine movement is conversion activity;
+                // otherwise an encode stuck at 90% can mask the watchdog.
+                if (fraction > lastEngineProgressRef.current + 0.0005) {
+                  lastEngineProgressRef.current = fraction;
+                  lastActivityRef.current = Date.now();
+                }
                 setProgress(pct);
 
                 setStatusText(
@@ -209,8 +216,8 @@ function ProcessingPage() {
             lastActivityRef,
           );
 
-          setStatusText("Mengunggah hasil...");
-          setProgress(99);
+          setStatusText("Encode selesai — mengunggah hasil...");
+          setProgress((current) => Math.max(current, 97));
           // Rendering can take minutes; refresh the token before upload.
           await ensureFreshSession();
           const userId = path.split("/")[0];
@@ -222,6 +229,8 @@ function ProcessingPage() {
             lastActivityRef,
           );
 
+          setStatusText("Memverifikasi hasil...");
+          setProgress(99);
           lastActivityRef.current = Date.now();
           result = await withWatchdog(
             completeLocalPipeline({
