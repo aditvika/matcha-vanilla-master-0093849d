@@ -78,15 +78,24 @@ export async function upscaleVideoLocally(
   const handleProgress = ({ progress }: { progress: number }) => {
     if (!Number.isFinite(progress)) return;
     const f = Math.max(0, Math.min(1, progress));
-    // Only a genuine forward move counts as activity — a stuck encoder that
-    // keeps re-emitting the same fraction must NOT keep the watchdog alive.
+    // A genuine forward move resets the stall watchdog.
     if (f > lastFraction + 0.0005) {
       lastFraction = f;
       lastMove = Date.now();
-      onProgress?.(f);
     }
+    // Always forward the fraction: the UI layer uses it as a liveness signal
+    // too, so a slow-but-working encode never looks frozen.
+    onProgress?.(Math.max(0, lastFraction));
   };
   ffmpeg.on("progress", handleProgress);
+
+  // FFmpeg emits log lines continuously even when the progress fraction has
+  // not advanced yet (muxing, long GOPs). Those count as "alive".
+  const handleLog = () => {
+    lastMove = Date.now();
+  };
+  ffmpeg.on("log", handleLog);
+
 
   const inputName = "input.bin";
   const outputName = "output.mp4";
