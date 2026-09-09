@@ -1,10 +1,18 @@
 /**
  * Organic progress pacing.
  *
- * The real engines report progress in bursts (or not at all), which feels
- * broken to users. The pacer drives a smooth, non-linear curve with gentle
- * random fluctuation towards a randomized target duration, and never passes
- * the ceiling until the real work resolves.
+ * IMPORTANT (bug history): the pacer used to be a pure simulation with a hard
+ * 0.97 ceiling. On long video encodes the simulation always reached that
+ * ceiling in ~1 minute while FFmpeg was still working, so the UI froze at
+ * "97%". Worse, `onProgress` was only called when the number moved, so the
+ * caller's stall watchdog saw no activity and eventually aborted a perfectly
+ * healthy encode.
+ *
+ * Now:
+ *  - Once the engine reports real progress, the real value drives the bar and
+ *    the simulation can never run ahead of it.
+ *  - Every tick emits a value (even an unchanged one) as a heartbeat, so
+ *    watchdogs upstream know work is still alive.
  */
 
 export type PaceRange = { minMs: number; maxMs: number };
@@ -31,9 +39,12 @@ export type Pacer = {
 export function startPacer(range: PaceRange, onProgress: (fraction: number) => void): Pacer {
   const total = naturalDuration(range);
   const started = Date.now();
-  const ceiling = 0.97;
+  const ceiling = 0.99;
+  /** Where the simulation alone is allowed to stop while we wait for real data. */
+  const simCeiling = 0.9;
   let shown = 0;
   let real = 0;
+  let realSeen = false;
   let timer: ReturnType<typeof setInterval> | null = null;
 
   const tick = () => {
@@ -41,12 +52,17 @@ export function startPacer(range: PaceRange, onProgress: (fraction: number) => v
     // Ease-out curve: fast start, long organic tail.
     const eased = 1 - Math.pow(1 - t, 2.2);
     const jitter = (Math.random() - 0.35) * 0.006;
-    const simulated = Math.min(ceiling, eased * ceiling + jitter);
-    const next = Math.max(shown, Math.min(ceiling, Math.max(simulated, real * ceiling)));
-    if (next > shown) {
-      shown = next;
-      onProgress(shown);
-    }
+    const simulated = Math.min(simCeiling, eased * simCeiling + jitter);
+
+    // Real engine data always wins once it exists: the simulation may never
+    // report more than what the engine has actually completed.
+    const target = realSeen
+      ? Math.min(ceiling, Math.max(real * ceiling, Math.min(simulated, real * ceiling + 0.03)))
+      : simulated;
+
+    if (target > shown) shown = target;
+    // Emit every tick — an unchanged value still counts as a liveness signal.
+    onProgress(shown);
   };
 
   timer = setInterval(tick, 180);
@@ -54,7 +70,9 @@ export function startPacer(range: PaceRange, onProgress: (fraction: number) => v
 
   return {
     report: (fraction: number) => {
-      if (Number.isFinite(fraction)) real = Math.max(0, Math.min(1, fraction));
+      if (!Number.isFinite(fraction)) return;
+      realSeen = true;
+      real = Math.max(real, Math.max(0, Math.min(1, fraction)));
     },
     finish: () => {
       if (timer) clearInterval(timer);
