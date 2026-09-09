@@ -202,7 +202,10 @@ async function run(engine: MediaEngine, options: ProcessOptions, kind: "photo" |
       signal: controller.signal,
       onProgress: (f) => pacer.report(f),
     });
-    pacer.finish();
+    // Engine completion is not delivery completion. Keep 100% reserved for
+    // the caller after upload, signing, and credit transaction all succeed.
+    pacer.stop();
+    options.onProgress?.(0.96);
     return result;
   } catch (error) {
     pacer.stop();

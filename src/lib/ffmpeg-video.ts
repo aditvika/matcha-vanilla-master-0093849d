@@ -89,23 +89,20 @@ export async function upscaleVideoLocally(
   };
   ffmpeg.on("progress", handleProgress);
 
-  // FFmpeg emits log lines continuously even when the progress fraction has
-  // not advanced yet (muxing, long GOPs). Those count as "alive".
-  const handleLog = () => {
-    lastMove = Date.now();
-  };
-  ffmpeg.on("log", handleLog);
-
-
   const inputName = "input.bin";
   const outputName = "output.mp4";
 
   // Any abort/timeout must kill the worker, otherwise the promise never settles.
   let watchdog: ReturnType<typeof setInterval> | undefined;
   let failure: Error | undefined;
+  let rejectAbort: ((error: Error) => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    rejectAbort = reject;
+  });
   const abort = (error: Error) => {
     if (failure) return;
     failure = error;
+    rejectAbort?.(error);
     try {
       ffmpeg.terminate();
     } catch {
@@ -133,28 +130,30 @@ export async function upscaleVideoLocally(
       ? `scale=-2:${height}:flags=bicubic`
       : `scale=-2:${height}:flags=lanczos,unsharp=5:5:0.8:3:3:0.4`;
 
-    const code = await ffmpeg.exec([
-      "-i",
-      inputName,
-      "-vf",
-      filter,
-      "-c:v",
-      "libx264",
-      "-preset",
-      mobile ? "ultrafast" : "veryfast",
-      "-crf",
-      mobile ? "24" : "20",
-      "-pix_fmt",
-      "yuv420p",
-      "-movflags",
-      "+faststart",
-      // Re-encode audio to AAC so any source codec lands cleanly in MP4.
-      "-c:a",
-      "aac",
-      "-b:a",
-      "192k",
-
-      outputName,
+    const code = await Promise.race([
+      ffmpeg.exec([
+        "-i",
+        inputName,
+        "-vf",
+        filter,
+        "-c:v",
+        "libx264",
+        "-preset",
+        mobile ? "ultrafast" : "veryfast",
+        "-crf",
+        mobile ? "24" : "20",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        // Re-encode audio to AAC so any source codec lands cleanly in MP4.
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        outputName,
+      ]),
+      aborted,
     ]);
 
     if (failure) throw failure;
@@ -179,7 +178,6 @@ export async function upscaleVideoLocally(
     signal?.removeEventListener("abort", onExternalAbort);
     if (!failure) {
       ffmpeg.off("progress", handleProgress);
-      ffmpeg.off("log", handleLog);
       await ffmpeg.deleteFile(inputName).catch(() => undefined);
       await ffmpeg.deleteFile(outputName).catch(() => undefined);
     }

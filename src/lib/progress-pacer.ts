@@ -39,9 +39,12 @@ export type Pacer = {
 export function startPacer(range: PaceRange, onProgress: (fraction: number) => void): Pacer {
   const total = naturalDuration(range);
   const started = Date.now();
-  const ceiling = 0.99;
-  /** Where the simulation alone is allowed to stop while we wait for real data. */
-  const simCeiling = 0.9;
+  /**
+   * Simulation only covers engine startup. Encoding progress owns the rest of
+   * the bar, so a missing engine signal is obvious instead of looking like a
+   * real conversion that has completed 90%.
+   */
+  const simCeiling = 0.12;
   let shown = 0;
   let real = 0;
   let realSeen = false;
@@ -54,10 +57,10 @@ export function startPacer(range: PaceRange, onProgress: (fraction: number) => v
     const jitter = (Math.random() - 0.35) * 0.006;
     const simulated = Math.min(simCeiling, eased * simCeiling + jitter);
 
-    // Real engine data always wins once it exists: the simulation may never
-    // report more than what the engine has actually completed.
+    // Reserve the final 4% for output validation/upload. Once real engine data
+    // exists it maps monotonically from 12% through 96%.
     const target = realSeen
-      ? Math.min(ceiling, Math.max(real * ceiling, Math.min(simulated, real * ceiling + 0.03)))
+      ? Math.min(0.96, Math.max(shown, simCeiling + real * (0.96 - simCeiling)))
       : simulated;
 
     if (target > shown) shown = target;
