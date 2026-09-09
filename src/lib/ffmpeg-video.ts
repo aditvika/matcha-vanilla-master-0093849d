@@ -179,9 +179,11 @@ export async function upscaleVideoLocally(
     signal?.removeEventListener("abort", onExternalAbort);
     if (!failure) {
       ffmpeg.off("progress", handleProgress);
+      ffmpeg.off("log", handleLog);
       await ffmpeg.deleteFile(inputName).catch(() => undefined);
       await ffmpeg.deleteFile(outputName).catch(() => undefined);
     }
+
   }
 }
 
