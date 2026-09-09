@@ -39,7 +39,6 @@ export type Pacer = {
 export function startPacer(range: PaceRange, onProgress: (fraction: number) => void): Pacer {
   const total = naturalDuration(range);
   const started = Date.now();
-  const ceiling = 0.99;
   /**
    * Simulation only covers engine startup. Encoding progress owns the rest of
    * the bar, so a missing engine signal is obvious instead of looking like a
