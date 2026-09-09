@@ -205,12 +205,12 @@ function ProcessingPage() {
                 );
               },
             }),
-            180_000,
+            300_000,
             lastActivityRef,
           );
 
           setStatusText("Mengunggah hasil...");
-          setProgress(98);
+          setProgress(99);
           // Rendering can take minutes; refresh the token before upload.
           await ensureFreshSession();
           const userId = path.split("/")[0];
@@ -218,9 +218,10 @@ function ProcessingPage() {
           lastActivityRef.current = Date.now();
           const outputPath = await withWatchdog(
             uploadProcessedMedia(local.blob, userId, local.extension, local.contentType),
-            180_000,
+            600_000,
             lastActivityRef,
           );
+
           lastActivityRef.current = Date.now();
           result = await withWatchdog(
             completeLocalPipeline({
