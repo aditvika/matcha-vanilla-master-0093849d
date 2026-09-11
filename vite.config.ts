@@ -11,17 +11,6 @@ export default defineConfig({
     // calls resolve against the current page path (e.g. /processing/_serverFn/...),
     // which returns the HTML router instead of JSON.
     base: '/',
-
-    build: {
-
-      rollupOptions: {
-        output: {
-          entryFileNames: `assets/index.js`,
-          chunkFileNames: `assets/[name].js`,
-          assetFileNames: `assets/[name].[ext]`
-        }
-      }
-    }
   },
   tanstackStart: {
     server: { entry: "server" },
